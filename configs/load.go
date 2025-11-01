@@ -9,6 +9,9 @@ import (
 
 func LoadConfig(fileName string) (*Config, error) {
 	config := DefaultConfig()
+	if fileName == "" {
+		return &config, nil
+	}
 
 	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		return nil, fmt.Errorf("config file does not exist, %w", err)
