@@ -1,6 +1,7 @@
 package info
 
 import (
+	"embed"
 	"strings"
 
 	"github.com/ffgan/gf/configs"
@@ -37,11 +38,12 @@ func GetInfoLines(config *configs.Config) []string {
 	}
 }
 
-func GetInfo(config *configs.Config) ([]string, []string) {
+func GetInfo(config *configs.Config, ASCIIFiles embed.FS) ([]string, []string) {
 	_, config.ASCIIDistro = cli.GetDistro(config.OSArch, config.DistroShorthand, config.ASCIIDistro)
 
-	asciiart := logo.PrintASCII(config.ASCIIDistro, config.ImageSource)
+	asciiart := logo.PrintASCII(config.ASCIIDistro, config.ImageSource, ASCIIFiles)
 
 	infoLines := GetInfoLines(config)
+
 	return asciiart, infoLines
 }

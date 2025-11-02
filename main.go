@@ -1,7 +1,14 @@
 package main
 
-import "github.com/ffgan/gf/cmd"
+import (
+	"embed"
+
+	"github.com/ffgan/gf/cmd"
+)
+
+//go:embed assets/*
+var assets embed.FS
 
 func main() {
-	cmd.Run()
+	cmd.Run(assets)
 }

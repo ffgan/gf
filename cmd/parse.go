@@ -88,7 +88,6 @@ func setupArgs(config *configs.Config) {
 
 func parseArgs(config *configs.Config) {
 	// TODO: if user setup config file in args. handle it first
-
 	setupArgs(config)
 
 	flag.Parse()

@@ -2,7 +2,9 @@ package logo
 
 import (
 	"bufio"
+	"embed"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,7 +28,7 @@ var (
 	colors          = []string{"distro"}
 )
 
-func getDistroASCII(ASCIIDistro string) {
+func getDistroASCII(ASCIIDistro string, ASCIIFiles embed.FS) {
 	filename := "assets/"
 
 	if strings.HasPrefix(ASCIIDistro, "Adélie") || strings.HasPrefix(ASCIIDistro, "Adelie") {
@@ -39,7 +41,14 @@ func getDistroASCII(ASCIIDistro string) {
 		filename += "Fedora"
 	}
 
-	data, _ := os.ReadFile(filename)
+	f, err := ASCIIFiles.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		panic(err)
+	}
 	asciiData = string(data)
 }
 
@@ -48,7 +57,7 @@ func stripEscapeCodes(s string) string {
 	return re.ReplaceAllString(s, "")
 }
 
-func PrintASCII(ASCIIDistro, imageSource string) (logo []string) {
+func PrintASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) (logo []string) {
 	fi, err := os.Stat(imageSource)
 	if err == nil && fi.Mode().IsRegular() {
 		ext := strings.ToLower(filepath.Ext(imageSource))
@@ -61,7 +70,7 @@ func PrintASCII(ASCIIDistro, imageSource string) (logo []string) {
 			}
 		}
 	} else if imageSource == "ascii" || imageSource == "auto" {
-		getDistroASCII(ASCIIDistro)
+		getDistroASCII(ASCIIDistro, ASCIIFiles)
 	} else {
 		asciiData = imageSource
 	}
@@ -91,8 +100,8 @@ func PrintASCII(ASCIIDistro, imageSource string) (logo []string) {
 	if lines == 1 {
 		lines = 0
 		imageSource = "auto"
-		getDistroASCII(ASCIIDistro)
-		PrintASCII(ASCIIDistro, imageSource)
+		getDistroASCII(ASCIIDistro, ASCIIFiles)
+		PrintASCII(ASCIIDistro, imageSource, ASCIIFiles)
 		return nil
 	}
 
