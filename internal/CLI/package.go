@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -56,7 +55,7 @@ func countPackages() string {
 		}
 	}
 
-	osname := runtime.GOOS
+	osname := getOS()
 
 	// --- Language package managers ---
 	if has("pipx") {
@@ -97,7 +96,7 @@ func countPackages() string {
 
 	// --- System package managers by OS ---
 	switch osname {
-	case "linux":
+	case Linux:
 		if has("dpkg") {
 			add("dpkg", tot("dpkg-query", "-f", ".\\n", "-W"))
 		}
@@ -123,14 +122,14 @@ func countPackages() string {
 				add("brew", dir(p1))
 			}
 		}
-	case "darwin":
+	case Darwin:
 		if has("brew") {
 			add("brew", dir("/usr/local/Cellar/*/"))
 		}
 		if has("port") {
 			add("macports", tot("port", "installed"))
 		}
-	case "windows":
+	case Windows:
 		if has("choco") {
 			pdata := os.Getenv("ProgramData")
 			if pdata == "" {

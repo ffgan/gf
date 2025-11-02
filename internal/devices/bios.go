@@ -4,12 +4,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func getBios(osName string) string {
+func getBIOS(osName string) string {
 	const dmiPath = "/sys/devices/virtual/dmi/id"
 
-	if !strings.Contains(osName, "Linux") {
+	if !strings.Contains(osName, cli.Linux) {
 		return ""
 	}
 

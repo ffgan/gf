@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	cli "github.com/ffgan/gf/internal/CLI"
 )
 
 func getDE() string {
@@ -13,17 +15,17 @@ func getDE() string {
 	}
 	deRun = true
 
-	osName := getOSName()
+	osName := cli.GetOS()
 	distro := getDistroName()
 
 	switch osName {
-	case "Mac OS X", "macOS":
+	case cli.MacOSX, cli.MacOS:
 		de = "Aqua"
 
-	case "ravynOS":
+	case cli.RavynOS:
 		de = "Magma"
 
-	case "Windows":
+	case cli.Windows:
 		switch {
 		case strings.Contains(distro, "Windows 10") || strings.Contains(distro, "Windows 11"):
 			de = "Fluent"
@@ -33,7 +35,7 @@ func getDE() string {
 			de = "Aero"
 		}
 
-	case "FreeMiNT":
+	case cli.FreeMiNT:
 		matches, _ := filepath.Glob("/proc/*")
 		for _, m := range matches {
 			switch {

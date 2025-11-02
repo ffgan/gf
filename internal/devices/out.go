@@ -19,5 +19,5 @@ func DetectBluetooth() string {
 }
 
 func GetBIOS() string {
-	return "BIOS: " + getBios(cli.GetOS())
+	return "BIOS: " + getBIOS(cli.GetOS())
 }

@@ -18,7 +18,7 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 	kernelVersion := getKernelVersion()
 
 	switch osName {
-	case "Linux", "BSD", "MINIX", "Ironclad":
+	case Linux, BSD, MINIX, Ironclad:
 		switch {
 		case fileExists("/etc/os-release"):
 			// Try to parse /etc/os-release
@@ -50,7 +50,7 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 		default:
 			distro = "Linux"
 		}
-	case "darwin":
+	case Darwin:
 		out := RunCommand("sw_vers", "-productVersion")
 		codename := "macOS"
 		version := out
@@ -67,7 +67,7 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 			codename = "macOS Sonoma"
 		}
 		distro = fmt.Sprintf("%s %s", codename, version)
-	case "windows":
+	case Windows:
 		// For Windows, use PowerShell to query ProductName
 		psCmd := `Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object -ExpandProperty ProductName`
 		out := RunCommand("powershell", "-Command", psCmd)
@@ -78,12 +78,12 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 				distro = strings.Replace(distro, "Windows 10", "Windows 11", 1)
 			}
 		}
-	case "solaris":
+	case Solaris:
 		distro = readFirstLine("/etc/release")
-	case "haiku":
-		distro = "Haiku"
-	case "aix":
-		distro = "AIX " + kernelVersion
+	case Haiku:
+		distro = Haiku
+	case AIX:
+		distro = AIX + " " + kernelVersion
 	default:
 		distro = osName + " " + kernelVersion
 	}

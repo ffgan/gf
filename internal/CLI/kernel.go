@@ -22,10 +22,10 @@ func getKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) st
 	}
 
 	switch osName {
-	case "Haiku":
+	case Haiku:
 		return getKernelRelease()
 
-	case "Windows":
+	case Windows:
 		out, _ := exec.Command("wmic", "os", "get", "Version").Output()
 		// remove "Version" header and trim
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
@@ -35,14 +35,14 @@ func getKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) st
 
 		return kernel
 
-	case "Solaris":
+	case Solaris:
 		ver := getKernelRelease()
 		if matched, _ := regexp.MatchString(`^11\.[0123]$`, ver); !matched {
 			kernel = ver
 		}
 		return kernel
 
-	case "Interix":
+	case Interix:
 		kernel = getKernelVersion() + " " +
 			getKernelMachine() + " " +
 			getKernelRelease()

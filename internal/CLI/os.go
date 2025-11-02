@@ -17,53 +17,53 @@ func getOS() string {
 	var osName string
 
 	switch {
-	case kernelName == "Darwin":
+	case kernelName == Darwin:
 		osName = getDarwinName()
 
-	case kernelName == "SunOS":
+	case kernelName == SunOS:
 		out, err := exec.Command("uname", "-o").Output()
-		if err == nil && strings.Contains(string(out), "illumos") {
-			osName = "illumos"
+		if err == nil && strings.Contains(string(out), illumos) {
+			osName = illumos
 		} else {
-			osName = "Solaris"
+			osName = Solaris
 		}
 
-	case kernelName == "Haiku":
+	case kernelName == Haiku:
 		osName = Haiku
 
-	case kernelName == "MINIX":
-		osName = "MINIX"
+	case kernelName == MINIX:
+		osName = MINIX
 
-	case kernelName == "AIX":
-		osName = "AIX"
+	case kernelName == AIX:
+		osName = AIX
 
-	case strings.HasPrefix(kernelName, "IRIX"):
-		osName = "IRIX"
+	case strings.HasPrefix(kernelName, IRIX):
+		osName = IRIX
 
-	case kernelName == "FreeMiNT":
-		osName = "FreeMiNT"
+	case kernelName == FreeMiNT:
+		osName = FreeMiNT
 
-	case kernelName == "Interix":
+	case kernelName == Interix:
 		osName = Interix
 
-	case kernelName == "Ironclad":
-		osName = "Ironclad"
+	case kernelName == Ironclad:
+		osName = Ironclad
 
-	case kernelName == "OSF1":
-		osName = "digitalUNIX"
+	case kernelName == OSF1:
+		osName = digitalUNIX
 
-	case kernelName == "Linux" || strings.HasPrefix(kernelName, "GNU"):
+	case kernelName == Linux || strings.HasPrefix(kernelName, GNU):
 		osName = Linux
 
-	case strings.HasSuffix(kernelName, "BSD") ||
-		kernelName == "DragonFly" ||
-		kernelName == "Bitrig":
-		osName = "BSD"
+	case strings.HasSuffix(kernelName, BSD) ||
+		kernelName == DragonFly ||
+		kernelName == Bitrig:
+		osName = BSD
 
-	case strings.HasPrefix(kernelName, "CYGWIN") ||
-		strings.HasPrefix(kernelName, "MSYS") ||
-		strings.HasPrefix(kernelName, "MINGW") ||
-		kernelName == "Windows_NT":
+	case strings.HasPrefix(kernelName, CYGWIN) ||
+		strings.HasPrefix(kernelName, MSYS) ||
+		strings.HasPrefix(kernelName, MINGW) ||
+		kernelName == Windows_NT:
 		osName = Windows
 
 	default:
@@ -79,7 +79,7 @@ func getOS() string {
 func getDarwinName() string {
 	out, err := exec.Command("sw_vers", "-productName").Output()
 	if err != nil {
-		return "Darwin"
+		return Darwin
 	}
 	return strings.TrimSpace(string(out))
 }

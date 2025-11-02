@@ -17,13 +17,13 @@ func getResolution() string {
 	osName := cli.GetOS()
 
 	switch osName {
-	case "macOS":
+	case cli.MacOS:
 		resolution = getResolutionMac()
-	case "iPhone OS":
+	case cli.Iphone:
 		resolution = getResolutionIOS()
-	case "Windows":
+	case cli.Windows:
 		resolution = getResolutionWindows()
-	case "Haiku":
+	case cli.Haiku:
 		resolution = getResolutionHaiku()
 	default:
 		resolution = getResolutionX11()

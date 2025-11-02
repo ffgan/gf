@@ -5,8 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
+
+	cli "github.com/ffgan/gf/internal/CLI"
 )
 
 func getWM() string {
@@ -15,7 +16,7 @@ func getWM() string {
 	}
 
 	kernelName := getKernelName()
-	osName := getOSName()
+	osName := cli.GetOS()
 	xdgRuntime := os.Getenv("XDG_RUNTIME_DIR")
 	waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
 	if waylandDisplay == "" {
@@ -52,7 +53,7 @@ func getWM() string {
 	}
 
 	// --- X11 detection ---
-	if wm == "" && display != "" && osName != "Mac OS X" && osName != "macOS" && osName != "FreeMiNT" {
+	if wm == "" && display != "" && osName != cli.MacOSX && osName != cli.MacOS && osName != cli.FreeMiNT {
 		wm = scanProcesses(psFlags, []string{
 			"sowm", "catwm", "fvwm", "dwm", "2bwm", "monsterwm", "tinywm", "x11fs", "xmonad",
 		})
@@ -67,7 +68,7 @@ func getWM() string {
 	// --- macOS detection ---
 	if wm == "" {
 		switch osName {
-		case "Mac OS X", "macOS":
+		case cli.MacOSX, cli.MacOS:
 			psLine := runCmd("ps", "-e")
 			switch {
 			case strings.Contains(psLine, "chunkwm"):
@@ -86,7 +87,7 @@ func getWM() string {
 				wm = "Quartz Compositor"
 			}
 
-		case "Windows":
+		case cli.Windows:
 			tasklist := runCmd("tasklist")
 			for _, w := range []string{"bugn", "Windawesome", "blackbox", "emerge", "litestep"} {
 				if strings.Contains(tasklist, w) {
@@ -101,7 +102,7 @@ func getWM() string {
 				wm += ", DWM.exe"
 			}
 
-		case "FreeMiNT":
+		case cli.FreeMiNT:
 			procs, _ := filepath.Glob("/proc/*")
 			for _, p := range procs {
 				switch {
@@ -135,19 +136,6 @@ func getWM() string {
 func getKernelName() string {
 	out := runCmd("uname", "-s")
 	return strings.TrimSpace(out)
-}
-
-func getOSName() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return "macOS"
-	case "windows":
-		return "Windows"
-	case "openbsd":
-		return "OpenBSD"
-	default:
-		return "Linux"
-	}
 }
 
 func tryLsofOrFuser(path string) string {

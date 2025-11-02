@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -17,19 +16,19 @@ func GetMemory(config *MemoryConfig) (*MemoryInfo, error) {
 	var memUsed, memTotal int64
 	var err error
 
-	switch runtime.GOOS {
-	case "linux":
+	switch getOS() {
+	case Linux:
 		memUsed, memTotal, err = getMemoryLinux()
-	case "darwin":
+	case Darwin:
 		memUsed, memTotal, err = getMemoryDarwin()
-	case "freebsd", "openbsd", "netbsd", "dragonfly":
+	case FreeBSD, OpenBSD, NetBSD, DragonFly:
 		memUsed, memTotal, err = getMemoryBSD()
-	case "solaris":
+	case Solaris:
 		memUsed, memTotal, err = getMemorySolaris()
-	case "windows":
+	case Windows:
 		memUsed, memTotal, err = getMemoryWindows()
 	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+		return nil, fmt.Errorf("unsupported operating system: %s", getOS())
 	}
 
 	if err != nil {
@@ -160,12 +159,12 @@ func getMemoryDarwin() (int64, int64, error) {
 }
 
 func getMemoryBSD() (int64, int64, error) {
-	kernelName := runtime.GOOS
+	osName := getOS()
 
 	// Get total memory
 	var memTotal int64
 	var err error
-	if kernelName == "netbsd" {
+	if osName == NetBSD {
 		memTotal, err = sysctlInt64("hw.physmem64")
 	} else {
 		memTotal, err = sysctlInt64("hw.physmem")
@@ -177,8 +176,8 @@ func getMemoryBSD() (int64, int64, error) {
 
 	var memFree int64
 
-	switch kernelName {
-	case "freebsd", "dragonfly":
+	switch osName {
+	case FreeBSD, DragonFly:
 		pageSize, err := sysctlInt64("hw.pagesize")
 		if err != nil {
 			return 0, 0, err
@@ -190,7 +189,7 @@ func getMemoryBSD() (int64, int64, error) {
 
 		memFree = (inactive + unused + cache) * pageSize / 1024
 
-	case "openbsd":
+	case OpenBSD:
 		// OpenBSD uses vmstat for memory info
 		memFree = getVmstatValue(3) // Used is in column 3
 		return memFree * 1024, memTotal, nil

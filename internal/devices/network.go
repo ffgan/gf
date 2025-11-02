@@ -10,13 +10,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	cli "github.com/ffgan/gf/internal/CLI"
 )
 
 func getNetwork(osName string) string {
-	if strings.Contains(osName, "Linux") {
+	if strings.Contains(osName, cli.Linux) {
 		return getNetworkLinux()
 	}
-	if strings.Contains(osName, "Mac OS X") || strings.Contains(osName, "macOS") {
+	if strings.Contains(osName, cli.MacOSX) || strings.Contains(osName, cli.MacOS) {
 		return getNetworkMac()
 	}
 	return "Unknown OS"

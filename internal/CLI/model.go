@@ -28,7 +28,7 @@ func getModel() string {
 	var model string
 
 	switch osName {
-	case "Linux":
+	case Linux:
 		if pathExists("/android/system/") || pathExists("/system/app/") {
 			model = fmt.Sprintf("%s %s",
 				runCmd("getprop", "ro.product.brand"),
@@ -47,7 +47,7 @@ func getModel() string {
 			model = readFileTrim("/tmp/sysinfo/model")
 		}
 
-	case "Mac OS X", "macOS", "ravynOS":
+	case MacOSX, MacOS, RavynOS:
 		arch := runCmd("arch")
 		isHackintosh := false
 		if arch != "arm64" {
@@ -72,7 +72,7 @@ func getModel() string {
 			}
 		}
 
-	case "iPhone OS":
+	case Iphone:
 		// Simplified mapping (full table omitted for brevity)
 		switch kernelMachine {
 		case "iPhone15,2":
@@ -83,19 +83,19 @@ func getModel() string {
 			model = kernelMachine
 		}
 
-	case "BSD", "MINIX":
+	case BSD, MINIX:
 		if kernelName == "FreeBSD" {
 			model = runCmd("kenv", "smbios.system.version")
 		} else {
 			model = runCmd("sysctl", "-n", "hw.vendor", "hw.product")
 		}
 
-	case "Windows":
+	case Windows:
 		model = runCmd("wmic", "computersystem", "get", "manufacturer,model")
 		model = strings.ReplaceAll(model, "Manufacturer", "")
 		model = strings.ReplaceAll(model, "Model", "")
 
-	case "Solaris", "illumos":
+	case Solaris, illumos:
 		model = runCmd("prtconf", "-b")
 		re := regexp.MustCompile(`banner-name:\s*(.+)`)
 		m := re.FindStringSubmatch(model)
@@ -110,14 +110,14 @@ func getModel() string {
 			model = fmt.Sprintf("%s (%s)", model, virt)
 		}
 
-	case "AIX":
+	case AIX:
 		model = runCmd("/usr/bin/uname", "-M")
 
-	case "FreeMiNT":
+	case FreeMiNT:
 		model = runCmd("sysctl", "-n", "hw.model")
 		model = strings.ReplaceAll(model, "(_MCH *)", "")
 
-	case "Interix":
+	case Interix:
 		model = runCmd("/dev/fs/C/Windows/System32/wbem/WMIC.exe", "computersystem", "get", "manufacturer,model")
 		model = strings.ReplaceAll(model, "Manufacturer", "")
 		model = strings.ReplaceAll(model, "Model", "")

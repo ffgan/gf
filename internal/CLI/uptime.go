@@ -14,7 +14,7 @@ func getUptime(uptimeShorthand string) string {
 	osName := getOS()
 
 	switch osName {
-	case "Linux", "windows":
+	case Linux, Windows:
 		// Try reading /proc/uptime
 		if data, err := os.ReadFile("/proc/uptime"); err == nil {
 			fields := strings.Fields(string(data))
@@ -35,7 +35,7 @@ func getUptime(uptimeShorthand string) string {
 			}
 		}
 
-	case "darwin", "freebsd", "netbsd", "openbsd":
+	case Darwin, FreeBSD, NetBSD, OpenBSD:
 		out, err := exec.Command("sysctl", "-n", "kern.boottime").Output()
 		if err == nil {
 			line := strings.TrimSpace(string(out))
@@ -46,7 +46,7 @@ func getUptime(uptimeShorthand string) string {
 			}
 		}
 
-	case "solaris":
+	case Solaris:
 		out, err := exec.Command("kstat", "-p", "unix:0:system_misc:boot_time").Output()
 		if err == nil {
 			fields := strings.Fields(string(out))
@@ -60,7 +60,7 @@ func getUptime(uptimeShorthand string) string {
 	default:
 		// Try a generic fallback with "ps -o etime"
 		var cmd *exec.Cmd
-		if osName == "aix" || osName == "irix" || osName == "ironclad" {
+		if osName == AIX || osName == IRIX || osName == Ironclad {
 			cmd = exec.Command("ps", "-o", "etime=", "-p", "1")
 		} else {
 			cmd = exec.Command("ps", "-o", "etime=", "-p", "0")

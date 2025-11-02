@@ -27,7 +27,7 @@ func getGPU() string {
 	case cli.Windows:
 		gpu = getWindowsGPU()
 
-	case "FreeBSD", "DragonFly":
+	case cli.FreeBSD, cli.DragonFly:
 		out := cli.RunCommand("pciconf", "-lv")
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "device") {
