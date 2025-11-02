@@ -18,6 +18,7 @@ func getBios(osName string) string {
 		if err != nil {
 			return ""
 		}
+
 		return strings.TrimSpace(string(data))
 	}
 

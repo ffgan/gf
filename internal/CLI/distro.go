@@ -51,7 +51,7 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 			distro = "Linux"
 		}
 	case "darwin":
-		out := runCommand("sw_vers", "-productVersion")
+		out := RunCommand("sw_vers", "-productVersion")
 		codename := "macOS"
 		version := out
 		switch {
@@ -70,8 +70,8 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 	case "windows":
 		// For Windows, use PowerShell to query ProductName
 		psCmd := `Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object -ExpandProperty ProductName`
-		out := runCommand("powershell", "-Command", psCmd)
-		build := runCommand("powershell", "-Command", "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty CurrentBuildNumber")
+		out := RunCommand("powershell", "-Command", psCmd)
+		build := RunCommand("powershell", "-Command", "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty CurrentBuildNumber")
 		distro = strings.TrimSpace(out)
 		if strings.Contains(distro, "Windows 10") {
 			if buildInt := strings.TrimSpace(build); buildInt >= "22000" {

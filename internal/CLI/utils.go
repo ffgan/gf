@@ -13,6 +13,18 @@ var (
 	termFont string
 )
 
+const (
+	Linux     string = "Linux"
+	MacOSX    string = "Mac OS X"
+	MacOS     string = "macOS"
+	Iphone    string = "iPhone OS"
+	Windows   string = "Windows"
+	Interix   string = "Interix"
+	Haiku     string = "Haiku"
+	FreeBSD   string = "FreeBSD"
+	DragonFly string = "DragonFly"
+)
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
@@ -30,13 +42,16 @@ func readFirstLine(path string) string {
 	return ""
 }
 
-func runCommand(name string, args ...string) string {
+func Trim(s string) string {
+	return strings.TrimSpace(s)
+}
+func RunCommand(name string, args ...string) string {
 	cmd := exec.Command(name, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(out))
+	return Trim(string(out))
 }
 
 func trimQuotes(s string) string {

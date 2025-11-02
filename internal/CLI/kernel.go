@@ -72,6 +72,10 @@ func getKernelVersion() string {
 	return uname("-r")
 }
 
+func GetKernelMachine() string {
+	return getKernelMachine()
+}
+
 func getKernelMachine() string {
 	return uname("-m")
 }

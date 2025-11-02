@@ -6,14 +6,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
+
+	cli "github.com/ffgan/gf/internal/CLI"
 )
 
 func getResolution() string {
 	var resolution string
-	osName := detectOS()
+	osName := cli.GetOS()
 
 	switch osName {
 	case "macOS":
@@ -110,7 +111,7 @@ func calcScale(res, px string) int {
 
 // --- iOS ---
 func getResolutionIOS() string {
-	machine := kernelMachine()
+	machine := cli.GetKernelMachine()
 	// 这里只实现示例映射，可继续扩展
 	table := map[string]string{
 		"iPhone14,7": "1170x2532",
@@ -120,12 +121,6 @@ func getResolutionIOS() string {
 		return val
 	}
 	return ""
-}
-
-func kernelMachine() string {
-	cmd := exec.Command("uname", "-m")
-	out, _ := cmd.Output()
-	return strings.TrimSpace(string(out))
 }
 
 // --- Windows ---
@@ -212,21 +207,7 @@ func getResolutionX11() string {
 	return ""
 }
 
-// --- Helpers ---
 func pathExists(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
-}
-
-func detectOS() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return "macOS"
-	case "windows":
-		return "Windows"
-	case "haiku":
-		return "Haiku"
-	default:
-		return "Linux"
-	}
 }

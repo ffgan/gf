@@ -5,53 +5,44 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
+
+	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func trim(s string) string {
-	return strings.TrimSpace(s)
-}
-
-func runCommand(cmd string, args ...string) string {
-	out, err := exec.Command(cmd, args...).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
-
 func getGPU() string {
-	osName := detectOS()
+	osName := cli.GetOS()
 	var gpu string
 
 	switch osName {
-	case "Linux":
+	case cli.Linux:
 		gpu = getLinuxGPU()
 
-	case "Mac OS X", "macOS":
+	case cli.MacOSX, cli.MacOS:
 		gpu = getMacGPU()
 
-	case "Windows":
+	case cli.Iphone:
+
+	case cli.Windows:
 		gpu = getWindowsGPU()
 
 	case "FreeBSD", "DragonFly":
-		out := runCommand("pciconf", "-lv")
+		out := cli.RunCommand("pciconf", "-lv")
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "device") {
-				gpu = trim(strings.SplitN(line, "=", 2)[1])
+				gpu = cli.Trim(strings.SplitN(line, "=", 2)[1])
 				break
 			}
 		}
 
 	default:
 		// Fallback: Try OpenGL
-		out := runCommand("glxinfo", "-B")
+		out := cli.RunCommand("glxinfo", "-B")
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "OpenGL renderer string") {
 				gpu = strings.TrimPrefix(line, "OpenGL renderer string:")
-				gpu = trim(gpu)
+				gpu = cli.Trim(gpu)
 				break
 			}
 		}
@@ -68,22 +59,43 @@ func getGPU() string {
 }
 
 func getLinuxGPU() string {
-	out := runCommand("lspci", "-mm")
+	out := cli.RunCommand("lspci", "-mm")
 	if out == "" {
 		return parseGLXInfo()
 	}
 
-	// Parse "Display", "3D", "VGA"
 	lines := strings.Split(out, "\n")
 	seen := map[string]bool{}
 	var gpus []string
 
 	re := regexp.MustCompile(`"([^"]+)"`)
+
 	for _, line := range lines {
 		if strings.Contains(line, "Display") || strings.Contains(line, "3D") || strings.Contains(line, "VGA") {
-			fields := re.FindAllString(line, -1)
-			if len(fields) >= 3 {
-				info := strings.Join(fields[1:], " ")
+			matches := re.FindAllStringSubmatch(line, -1)
+			if len(matches) >= 3 {
+				// matches[0][1] = 第1个引号内容 (类型,如 "VGA compatible controller")
+				// matches[1][1] = 第2个引号内容 (厂商,如 "Advanced Micro Devices...")
+				// matches[2][1] = 第3个引号内容 (设备名,如 "Cezanne...")
+
+				vendor := matches[1][1] // $3 in awk
+				var device string
+
+				// 检查倒数第二个字段是否为空或是 "Device xxxx" 格式
+				if len(matches) >= 4 {
+					lastField := matches[len(matches)-1][1]
+					// 如果最后一个字段是 "Device [hex]" 格式,使用 $4
+					if strings.HasPrefix(lastField, "Device ") {
+						device = matches[2][1] // $4
+					} else {
+						device = lastField // $(NF-1)
+					}
+				} else {
+					device = matches[2][1]
+				}
+
+				info := vendor + " " + device
+
 				if !seen[info] {
 					seen[info] = true
 					gpus = append(gpus, info)
@@ -96,32 +108,113 @@ func getLinuxGPU() string {
 		return parseGLXInfo()
 	}
 
-	// Try to normalize brand names
-	for i, gpu := range gpus {
+	// Normalize brand names
+	var normalizedGPUs []string
+	for _, gpu := range gpus {
+		original := gpu
+		var brand string
+
 		switch {
-		case strings.Contains(gpu, "AMD"), strings.Contains(gpu, "ATI"):
+		case strings.Contains(gpu, "Advanced"):
+			// Determine AMD/ATI brand
+			if strings.Contains(gpu, "AMD") && strings.Contains(gpu, "ATI") {
+				brand = "AMD ATI"
+			} else if strings.Contains(gpu, "AMD") {
+				brand = "AMD"
+			} else if strings.Contains(gpu, "ATI") {
+				brand = "ATI"
+			}
+
+			// Clean up GPU name
 			gpu = strings.ReplaceAll(gpu, "[AMD/ATI]", "")
+			gpu = strings.ReplaceAll(gpu, "[AMD]", "")
+			gpu = strings.ReplaceAll(gpu, "OEM", "")
 			gpu = strings.ReplaceAll(gpu, "Advanced Micro Devices, Inc.", "")
-			gpus[i] = "AMD " + trim(gpu)
+
+			// Extract content within brackets
+			if idx := strings.Index(gpu, "["); idx != -1 {
+				gpu = gpu[idx+1:]
+				if idx := strings.Index(gpu, "]"); idx != -1 {
+					gpu = gpu[:idx]
+				}
+			}
+
+			gpu = brand + " " + strings.TrimSpace(gpu)
+
 		case strings.Contains(gpu, "NVIDIA"):
-			gpu = strings.ReplaceAll(gpu, "[NVIDIA]", "")
-			gpus[i] = "NVIDIA " + trim(gpu)
+			// Remove everything before "NVIDIA"
+			if idx := strings.Index(gpu, "NVIDIA"); idx != -1 {
+				gpu = gpu[idx:]
+			}
+
+			// Extract content within brackets
+			if idx := strings.Index(gpu, "["); idx != -1 {
+				gpu = gpu[idx+1:]
+				if idx := strings.Index(gpu, "]"); idx != -1 {
+					gpu = gpu[:idx]
+				}
+			}
+
+			gpu = "NVIDIA " + strings.TrimSpace(gpu)
+
 		case strings.Contains(gpu, "Intel"):
+			// Keep from "Intel" onwards
+			if idx := strings.Index(gpu, "Intel"); idx != -1 {
+				gpu = gpu[idx:]
+			}
+
+			gpu = strings.ReplaceAll(gpu, "(R)", "")
 			gpu = strings.ReplaceAll(gpu, "Corporation", "")
-			gpus[i] = "Intel " + trim(gpu)
+			gpu = strings.ReplaceAll(gpu, "Integrated Graphics Controller", "")
+
+			// Remove content in parentheses
+			if idx := strings.Index(gpu, "("); idx != -1 {
+				gpu = gpu[:idx]
+			}
+
+			// Handle Xeon case
+			if strings.Contains(original, "Xeon") {
+				gpu = "Intel HD Graphics"
+			}
+
+			gpu = strings.TrimSpace(gpu)
+			if gpu == "" || gpu == "Intel" {
+				gpu = "Intel Integrated Graphics"
+			}
+
+		case strings.Contains(gpu, "MCST") && strings.Contains(gpu, "MGA2"):
+			gpu = "MCST MGA2"
+
 		case strings.Contains(gpu, "VirtualBox"):
-			gpus[i] = "VirtualBox Graphics Adapter"
+			gpu = "VirtualBox Graphics Adapter"
+
+		default:
+			// Skip unrecognized GPUs (like the bash 'continue')
+			continue
 		}
+
+		// Optional: Remove brand prefix if gpu_brand is "off"
+		// if c.config.GPUBrand == "off" {
+		//     gpu = strings.TrimPrefix(gpu, "AMD ")
+		//     gpu = strings.TrimPrefix(gpu, "NVIDIA ")
+		//     gpu = strings.TrimPrefix(gpu, "Intel ")
+		// }
+
+		normalizedGPUs = append(normalizedGPUs, gpu)
 	}
 
-	return strings.Join(gpus, ", ")
+	if len(normalizedGPUs) == 0 {
+		return parseGLXInfo()
+	}
+
+	return strings.Join(normalizedGPUs, ", ")
 }
 
 func parseGLXInfo() string {
-	out := runCommand("glxinfo", "-B")
+	out := cli.RunCommand("glxinfo", "-B")
 	for _, line := range strings.Split(out, "\n") {
 		if strings.Contains(line, "OpenGL renderer string") {
-			return trim(strings.TrimPrefix(line, "OpenGL renderer string:"))
+			return cli.Trim(strings.TrimPrefix(line, "OpenGL renderer string:"))
 		}
 	}
 	return ""
@@ -129,8 +222,8 @@ func parseGLXInfo() string {
 
 func getMacGPU() string {
 	// macOS ARM (Apple Silicon)
-	if runCommand("uname", "-m") == "arm64" {
-		chip := runCommand("system_profiler", "SPDisplaysDataType")
+	if cli.RunCommand("uname", "-m") == "arm64" {
+		chip := cli.RunCommand("system_profiler", "SPDisplaysDataType")
 		chipset := parseSystemProfiler(chip, "Chipset Model")
 		cores := parseSystemProfiler(chip, "Total Number of Cores")
 		if chipset != "" {
@@ -139,7 +232,7 @@ func getMacGPU() string {
 	}
 
 	// Intel mac
-	out := runCommand("system_profiler", "SPDisplaysDataType")
+	out := cli.RunCommand("system_profiler", "SPDisplaysDataType")
 	return parseSystemProfiler(out, "Chipset Model")
 }
 
@@ -161,10 +254,10 @@ func parseSystemProfiler(data, key string) string {
 }
 
 func getWindowsGPU() string {
-	out := runCommand("wmic", "path", "Win32_VideoController", "get", "caption")
+	out := cli.RunCommand("wmic", "path", "Win32_VideoController", "get", "caption")
 	var gpus []string
 	for _, line := range strings.Split(out, "\n") {
-		line = trim(line)
+		line = cli.Trim(line)
 		if line == "" || strings.Contains(line, "Caption") {
 			continue
 		}

@@ -1,6 +1,8 @@
 package info
 
 import (
+	"strings"
+
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
 	gui "github.com/ffgan/gf/internal/GUI"
@@ -10,6 +12,8 @@ import (
 
 func GetInfoLines(config *configs.Config) []string {
 	return []string{
+		cli.GetTitle(),
+		strings.Repeat("-", 10),
 		cli.PrintDistro(config.OSArch, config.DistroShorthand, config.ASCIIDistro),
 		cli.PrintHost(),
 		cli.PrintKernel(config.OSArch, config.DistroShorthand, config.KernelShorthand, config.ASCIIDistro),

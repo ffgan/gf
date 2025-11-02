@@ -159,9 +159,9 @@ func formatNetworks(list []string) string {
 			if n == "2500" {
 				result.WriteString("2.5 Gbps; ")
 			} else if val%1000 == 0 {
-				result.WriteString(fmt.Sprintf("%d Mbps; ", val))
-			} else {
 				result.WriteString(fmt.Sprintf("%s Gbps; ", strings.TrimSuffix(n, "000")))
+			} else {
+				result.WriteString(fmt.Sprintf("%d Mbps; ", val))
 			}
 		}
 	}

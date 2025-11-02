@@ -29,7 +29,7 @@ func getOS() string {
 		}
 
 	case kernelName == "Haiku":
-		osName = "Haiku"
+		osName = Haiku
 
 	case kernelName == "MINIX":
 		osName = "MINIX"
@@ -44,7 +44,7 @@ func getOS() string {
 		osName = "FreeMiNT"
 
 	case kernelName == "Interix":
-		osName = "Interix"
+		osName = Interix
 
 	case kernelName == "Ironclad":
 		osName = "Ironclad"
@@ -53,7 +53,7 @@ func getOS() string {
 		osName = "digitalUNIX"
 
 	case kernelName == "Linux" || strings.HasPrefix(kernelName, "GNU"):
-		osName = "Linux"
+		osName = Linux
 
 	case strings.HasSuffix(kernelName, "BSD") ||
 		kernelName == "DragonFly" ||
@@ -64,7 +64,7 @@ func getOS() string {
 		strings.HasPrefix(kernelName, "MSYS") ||
 		strings.HasPrefix(kernelName, "MINGW") ||
 		kernelName == "Windows_NT":
-		osName = "Windows"
+		osName = Windows
 
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown OS detected: '%s', aborting...\n", kernelName)
