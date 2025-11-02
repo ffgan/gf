@@ -8,9 +8,9 @@ func GetDisk() string {
 	return "Disk: " + getDisk()
 }
 
-func GetMemory() string {
-	return "Memory: " + getMemory()
-}
+// func GetMemory() string {
+// 	return "Memory: " + getMemory()
+// }
 
 func DetectPackages() string {
 	return "Packages: " + get_packages()

@@ -1,32 +1,404 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"math"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/ffgan/gf/configs"
 )
 
-func getMemory() string {
-	b, err := os.ReadFile("/proc/meminfo")
+func GetMemory(config *MemoryConfig) (*MemoryInfo, error) {
+	var memUsed, memTotal int64
+	var err error
+
+	switch runtime.GOOS {
+	case "linux":
+		memUsed, memTotal, err = getMemoryLinux()
+	case "darwin":
+		memUsed, memTotal, err = getMemoryDarwin()
+	case "freebsd", "openbsd", "netbsd", "dragonfly":
+		memUsed, memTotal, err = getMemoryBSD()
+	case "solaris":
+		memUsed, memTotal, err = getMemorySolaris()
+	case "windows":
+		memUsed, memTotal, err = getMemoryWindows()
+	default:
+		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+
 	if err != nil {
-		return "unknown"
+		return nil, err
 	}
-	var memTotal, memFree int64
-	for _, line := range strings.Split(string(b), "\n") {
-		if strings.HasPrefix(line, "MemTotal:") {
-			fields := strings.Fields(line)
-			memTotal, _ = strconv.ParseInt(fields[1], 10, 64)
+
+	info := &MemoryInfo{
+		UsedKiB:  memUsed,
+		TotalKiB: memTotal,
+	}
+
+	if config.ShowPercent && memTotal > 0 {
+		info.Percent = int(memUsed * 100 / memTotal)
+	}
+
+	info.Formatted = formatMemory(memUsed, memTotal, info.Percent, config)
+
+	return info, nil
+}
+
+func getMemoryLinux() (int64, int64, error) {
+	file, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer file.Close()
+
+	var memTotal, memFree, buffers, cached, sReclaimable, shmem, memAvail int64
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
 		}
-		if strings.HasPrefix(line, "MemAvailable:") {
-			fields := strings.Fields(line)
-			memFree, _ = strconv.ParseInt(fields[1], 10, 64)
+
+		key := strings.TrimSuffix(fields[0], ":")
+		value, _ := strconv.ParseInt(fields[1], 10, 64)
+
+		switch key {
+		case "MemTotal":
+			memTotal = value
+		case "MemFree":
+			memFree = value
+		case "Buffers":
+			buffers = value
+		case "Cached":
+			cached = value
+		case "SReclaimable":
+			sReclaimable = value
+		case "Shmem":
+			shmem = value
+		case "MemAvailable":
+			memAvail = value
 		}
 	}
-	if memTotal == 0 {
-		return "unknown"
+
+	if err := scanner.Err(); err != nil {
+		return 0, 0, err
 	}
-	used := (memTotal - memFree) / 1024
-	total := memTotal / 1024
-	return fmt.Sprintf("%dMiB / %dMiB", used, total)
+
+	var memUsed int64
+	if memAvail > 0 {
+		// Use MemAvailable if available (Linux 3.14+)
+		memUsed = memTotal - memAvail
+	} else {
+		// MemUsed = MemTotal + Shmem - MemFree - Buffers - Cached - SReclaimable
+		memUsed = memTotal + shmem - memFree - buffers - cached - sReclaimable
+	}
+
+	return memUsed, memTotal, nil
+}
+
+func getMemoryDarwin() (int64, int64, error) {
+	// Get page size
+	pageSize, err := sysctlInt64("hw.pagesize")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Get total memory
+	memTotal, err := sysctlInt64("hw.memsize")
+	if err != nil {
+		return 0, 0, err
+	}
+	memTotal /= 1024 // Convert to KiB
+
+	// Get pageable and purgeable counts
+	pageable, err := sysctlInt64("vm.page_pageable_internal_count")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	purgeable, err := sysctlInt64("vm.page_purgeable_count")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Get vm_stat output for wired and compressed pages
+	cmd := exec.Command("vm_stat")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var wired, compressed int64
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "wired") {
+			fields := strings.Fields(line)
+			if len(fields) >= 4 {
+				wired, _ = strconv.ParseInt(strings.TrimSuffix(fields[3], "."), 10, 64)
+			}
+		}
+		if strings.Contains(line, "occupied") {
+			fields := strings.Fields(line)
+			if len(fields) >= 5 {
+				compressed, _ = strconv.ParseInt(strings.TrimSuffix(fields[4], "."), 10, 64)
+			}
+		}
+	}
+
+	pagesApp := pageable - purgeable
+	memUsed := (pagesApp + wired + compressed) * pageSize / 1024
+
+	return memUsed, memTotal, nil
+}
+
+func getMemoryBSD() (int64, int64, error) {
+	kernelName := runtime.GOOS
+
+	// Get total memory
+	var memTotal int64
+	var err error
+	if kernelName == "netbsd" {
+		memTotal, err = sysctlInt64("hw.physmem64")
+	} else {
+		memTotal, err = sysctlInt64("hw.physmem")
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+	memTotal /= 1024 // Convert to KiB
+
+	var memFree int64
+
+	switch kernelName {
+	case "freebsd", "dragonfly":
+		pageSize, err := sysctlInt64("hw.pagesize")
+		if err != nil {
+			return 0, 0, err
+		}
+
+		inactive, _ := sysctlInt64("vm.stats.vm.v_inactive_count")
+		unused, _ := sysctlInt64("vm.stats.vm.v_free_count")
+		cache, _ := sysctlInt64("vm.stats.vm.v_cache_count")
+
+		memFree = (inactive + unused + cache) * pageSize / 1024
+
+	case "openbsd":
+		// OpenBSD uses vmstat for memory info
+		memFree = getVmstatValue(3) // Used is in column 3
+		return memFree * 1024, memTotal, nil
+
+	default:
+		// Generic BSD
+		memFree = getVmstatValue(5)
+	}
+
+	memUsed := memTotal - memFree
+	return memUsed, memTotal, nil
+}
+
+func getMemorySolaris() (int64, int64, error) {
+	pageSize, err := getPageSize()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Get total pages
+	cmd := exec.Command("kstat", "-p", "unix:0:system_pages:pagestotal")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, 0, err
+	}
+	fields := strings.Fields(string(output))
+	pagesTotal, _ := strconv.ParseInt(fields[len(fields)-1], 10, 64)
+
+	// Get free pages
+	cmd = exec.Command("kstat", "-p", "unix:0:system_pages:pagesfree")
+	output, err = cmd.Output()
+	if err != nil {
+		return 0, 0, err
+	}
+	fields = strings.Fields(string(output))
+	pagesFree, _ := strconv.ParseInt(fields[len(fields)-1], 10, 64)
+
+	memTotal := pagesTotal * pageSize / 1024
+	memFree := pagesFree * pageSize / 1024
+	memUsed := memTotal - memFree
+
+	return memUsed, memTotal, nil
+}
+
+func getMemoryWindows() (int64, int64, error) {
+	// This is a simplified version for Windows
+	// In practice, you'd use golang.org/x/sys/windows for proper Windows API calls
+	return 0, 0, fmt.Errorf("Windows support requires additional implementation")
+}
+
+func sysctlInt64(name string) (int64, error) {
+	cmd := exec.Command("sysctl", "-n", name)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	value, err := strconv.ParseInt(strings.TrimSpace(string(output)), 10, 64)
+	return value, err
+}
+
+func getPageSize() (int64, error) {
+	cmd := exec.Command("pagesize")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	value, err := strconv.ParseInt(strings.TrimSpace(string(output)), 10, 64)
+	return value, err
+}
+
+func getVmstatValue(column int) int64 {
+	cmd := exec.Command("vmstat")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 3 {
+		return 0
+	}
+	fields := strings.Fields(lines[len(lines)-2])
+	if len(fields) > column {
+		value, _ := strconv.ParseInt(fields[column], 10, 64)
+		return value
+	}
+	return 0
+}
+
+func formatMemory(usedKiB, totalKiB int64, percent int, config *MemoryConfig) string {
+	var label string
+	var divider int64 = 1
+
+	switch config.Unit {
+	case "tib":
+		label = "TiB"
+		divider = 1024 * 1024 * 1024
+	case "gib":
+		label = "GiB"
+		divider = 1024 * 1024
+	case "kib":
+		label = "KiB"
+		divider = 1
+	default: // mib
+		label = "MiB"
+		divider = 1024
+	}
+
+	var usedStr, totalStr string
+	if config.Precision == 0 {
+		usedStr = fmt.Sprintf("%d", usedKiB/divider)
+		totalStr = fmt.Sprintf("%d", totalKiB/divider)
+	} else {
+		multiplier := int64(math.Pow(10, float64(config.Precision)))
+		usedInt := usedKiB / divider
+		usedDec := (usedKiB % divider) * multiplier / divider
+		totalInt := totalKiB / divider
+		totalDec := (totalKiB % divider) * multiplier / divider
+
+		format := fmt.Sprintf("%%d.%%0%dd", config.Precision)
+		usedStr = fmt.Sprintf(format, usedInt, usedDec)
+		totalStr = fmt.Sprintf(format, totalInt, totalDec)
+	}
+
+	info := fmt.Sprintf("%s %s / %s %s", usedStr, label, totalStr, label)
+	if config.ShowPercent {
+		info += fmt.Sprintf(" (%d%%)", percent)
+	}
+
+	switch config.DisplayMode {
+	case "bar":
+		return generateBar(usedKiB, totalKiB, config)
+	case "infobar":
+		return info + " " + generateBar(usedKiB, totalKiB, config)
+	case "barinfo":
+		return generateBar(usedKiB, totalKiB, config) + " " + info
+	default:
+		return info
+	}
+}
+
+func generateBar(used, total int64, config *MemoryConfig) string {
+	if total == 0 {
+		return ""
+	}
+
+	filled := int(float64(used) / float64(total) * float64(config.BarWidth))
+	if filled > config.BarWidth {
+		filled = config.BarWidth
+	}
+
+	bar := strings.Repeat(config.BarCharFilled, filled)
+	bar += strings.Repeat(config.BarCharEmpty, config.BarWidth-filled)
+
+	return "[" + bar + "]"
+}
+
+func PrintMem(mem configs.Memory, bar configs.ProgressBar) string {
+	precision, err := strconv.Atoi(mem.MemPrecision)
+	if err != nil {
+		fmt.Printf("failed to parse MemPrecision, %v\n", err)
+		return ""
+	}
+
+	BarLength, err := strconv.Atoi(bar.BarLength)
+	if err != nil {
+		fmt.Printf("failed to parse MemPrecision, %v\n", err)
+		return ""
+	}
+
+	var ShowPercent bool
+	switch mem.MemoryPercent {
+	case "on":
+		ShowPercent = true
+	case "off":
+		ShowPercent = false
+	}
+
+	config := &MemoryConfig{
+		Unit:          mem.MemoryUnit,
+		Precision:     precision,
+		ShowPercent:   ShowPercent,
+		DisplayMode:   bar.MemoryDisplay,
+		BarWidth:      BarLength,
+		BarCharFilled: bar.BarCharTotal,
+		BarCharEmpty:  bar.BarCharElapsed,
+	}
+
+	info, err := GetMemory(config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting memory info: %v\n", err)
+		os.Exit(1)
+	}
+	return "Memory: " + info.Formatted
+}
+
+type MemoryInfo struct {
+	UsedKiB   int64
+	TotalKiB  int64
+	Percent   int
+	Formatted string
+}
+
+type MemoryConfig struct {
+	Unit          string // "tib", "gib", "mib", "kib"
+	Precision     int
+	ShowPercent   bool
+	DisplayMode   string // "bar", "infobar", "barinfo", ""
+	BarWidth      int
+	BarCharFilled string
+	BarCharEmpty  string
 }

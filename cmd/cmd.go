@@ -13,10 +13,7 @@ func Run() {
 
 	parseArgs(config)
 
-	// fmt.Printf("%+v", config)
-	// fmt.Println()
+	ascii, lines := info.GetInfo(config)
 
-	info.Setup(config)
-
-	info.PrintInfo(config)
+	info.PrintInfo(ascii, lines)
 }
