@@ -10,6 +10,7 @@ import (
 )
 
 func PrintInfo(asciiart, infoLines []string) {
+	// TODO: 修复配色问题
 	lines := utils.MaxLen(asciiart, len(infoLines))
 
 	var leftMax int

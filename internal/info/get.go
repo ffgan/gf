@@ -12,8 +12,11 @@ import (
 )
 
 func GetInfoLines(config *configs.Config) []string {
+	// TODO: 有些行的信息无法读取的时候，应当不显示
+	// TOOD: 读取配置文件，控制显示的行
 	return []string{
 		cli.GetTitle(),
+		// TODO: 这里数字应该与title长度有关
 		strings.Repeat("-", 10),
 		cli.PrintDistro(config.OSArch, config.DistroShorthand, config.ASCIIDistro),
 		cli.PrintHost(),

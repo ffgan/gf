@@ -13,6 +13,9 @@ func GetDisk() string {
 // }
 
 func DetectPackages() string {
+	// TODO: 修复与hyfetch不一致的地方
+	// Packages: 227 (pip), 2699 (rpm), 25 (flatpak)
+	// Packages: 227 (pip), 2699 (rpm), 19 (flatpak-system), 6 (flatpak-user)
 	return "Packages: " + get_packages()
 }
 
@@ -45,6 +48,9 @@ func PrintHost() string {
 }
 
 func PrintDistro(osArch, distroShorthand, ascii_distro string) string {
+	// TODO: 修复与hyfetch不一致的地方
+	//  OS: Fedora Linux 43 x86_64
+	//  OS: Fedora Linux 43 (COSMIC) x86_64
 	distro, _ := getDistro(osArch, distroShorthand, ascii_distro)
 	return "OS: " + distro
 }
