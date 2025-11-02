@@ -1,0 +1,24 @@
+name: CI
+on:
+    push:
+jobs:
+    Ubuntu:
+        runs-on: ubuntu-latest
+        container:
+            image: ubuntu
+        steps:
+            - uses: actions/checkout@v5
+            - uses: actions/setup-go@v6
+              with:
+                  go-version: "1.24"
+            - run: go run main.go
+    Alpine:
+        runs-on: ubuntu-latest
+        container:
+            image: alpine
+        steps:
+            - uses: actions/checkout@v5
+            - uses: actions/setup-go@v6
+              with:
+                  go-version: "1.24"
+            - run: go run main.go
