@@ -31,15 +31,13 @@ var (
 func getDistroASCII(ASCIIDistro string, ASCIIFiles embed.FS) {
 	filename := "assets/"
 
-	if strings.HasPrefix(ASCIIDistro, "Adélie") || strings.HasPrefix(ASCIIDistro, "Adelie") {
-		setColors(4, 7, 6)
-		filename += "adelie"
+	_, v, ok := r.LongestPrefix(ASCIIDistro)
+	if !ok {
+		panic("not found distro")
 	}
-
-	if strings.HasPrefix(ASCIIDistro, "Fedora") {
-		setColors(12, 7)
-		filename += "Fedora"
-	}
+	dc := v.(DistroWithColor)
+	filename += dc.FileName
+	setColors(dc.Colors...)
 
 	f, err := ASCIIFiles.Open(filename)
 	if err != nil {
