@@ -1,19 +1,19 @@
 package gui
 
 func GetWM() string {
-	return "WM: " + getWM()
+	return getWM()
 }
 
 func GetDE() string {
-	return "DE: " + getDE()
+	return getDE()
 }
 
 func GetTheme() string {
-	return "Theme: " + getTheme()
+	return getTheme()
 }
 
 func GetIcons() string {
-	return "Icons: " + getIcons()
+	return getIcons()
 }
 
 func GetFont() string {
@@ -21,5 +21,5 @@ func GetFont() string {
 }
 
 func GetCursor() string {
-	return "Cursor: " + getCursor()
+	return getCursor()
 }

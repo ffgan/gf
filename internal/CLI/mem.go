@@ -382,7 +382,7 @@ func PrintMem(mem configs.Memory, bar configs.ProgressBar) string {
 		fmt.Fprintf(os.Stderr, "Error getting memory info: %v\n", err)
 		os.Exit(1)
 	}
-	return "Memory: " + info.Formatted
+	return info.Formatted
 }
 
 type MemoryInfo struct {

@@ -3,14 +3,12 @@ package info
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/ffgan/gf/internal/logo"
 	"github.com/ffgan/gf/internal/utils"
 )
 
 func PrintInfo(asciiart, infoLines []string) {
-	// TODO: 修复配色问题
 	lines := utils.MaxLen(asciiart, len(infoLines))
 
 	var leftMax int
@@ -28,17 +26,21 @@ func PrintInfo(asciiart, infoLines []string) {
 		} else {
 			left = ""
 		}
+		fmt.Printf("%s\n", left)
+	}
+
+	// move cursor to top
+	fmt.Printf("\033[%dA", lines)
+	leftMax += 2
+
+	for i := 0; i < lines; i++ {
+		fmt.Printf("\033[%dC", leftMax)
 		right := ""
 		if i < len(infoLines) {
 			right = infoLines[i]
 		}
 		// TODO: 处理转义字符
-		visLen := visibleLen(left)
-		padding := leftMax - visLen
-		if padding < 0 {
-			padding = 0
-		}
-		fmt.Printf("%s%s  %s\n", left, strings.Repeat(" ", padding), right)
+		fmt.Printf("%s\n", right)
 	}
 
 	fmt.Println(logo.Reset)

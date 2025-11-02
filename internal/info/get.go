@@ -18,27 +18,32 @@ func GetInfoLines(config *configs.Config) []string {
 		cli.GetTitle(),
 		// TODO: 这里数字应该与title长度有关
 		strings.Repeat("-", 10),
-		cli.PrintDistro(config.OSArch, config.DistroShorthand, config.ASCIIDistro),
-		cli.PrintHost(),
-		cli.PrintKernel(config.OSArch, config.DistroShorthand, config.KernelShorthand, config.ASCIIDistro),
-		cli.GetUptime(config.UptimeShorthand),
-		cli.DetectPackages(),
-		cli.PrintShell(config.ShellPath, config.ShellVersion),
-		cli.Geteditor(),
-		dev.DetectResolution(),
-		gui.GetDE(),
-		gui.GetWM(),
-		gui.GetTheme(),
-		gui.GetIcons(),
-		gui.GetCursor(),
-		cli.GetTerm(),
-		cli.GetCPU(),
-		dev.DetectGPU(),
-		cli.PrintMem(config.Memory, config.ProgressBar),
-		dev.DetectNetwork(),
-		dev.DetectBluetooth(),
-		dev.GetBIOS(),
+		Info("OS", cli.PrintDistro(config.OSArch, config.DistroShorthand, config.ASCIIDistro)),
+		Info("Host", cli.PrintHost()),
+		Info("Kernel", cli.PrintKernel(config.OSArch, config.DistroShorthand, config.KernelShorthand, config.ASCIIDistro)),
+		Info("Uptime", cli.GetUptime(config.UptimeShorthand)),
+		Info("Packages", cli.DetectPackages()),
+		Info("Shell", cli.PrintShell(config.ShellPath, config.ShellVersion)),
+		Info("Editor", cli.Geteditor()),
+		Info("Resolution", dev.DetectResolution()),
+		Info("DE", gui.GetDE()),
+		Info("WM", gui.GetWM()),
+		Info("Theme", gui.GetTheme()),
+		Info("Icons", gui.GetIcons()),
+		Info("Cursor", gui.GetCursor()),
+		Info("Terminal", cli.GetTerm()),
+		Info("CPU", cli.GetCPU()),
+		Info("GPU", dev.DetectGPU()),
+		Info("Memory", cli.PrintMem(config.Memory, config.ProgressBar)),
+		Info("Network", dev.DetectNetwork()),
+		Info("Bluetooth", dev.DetectBluetooth()),
+		Info("BIOS", dev.GetBIOS()),
 	}
+}
+
+func Info(name, data string) string {
+	name = "\033[1;34m" + name + ": \033[0m"
+	return name + data
 }
 
 func GetInfo(config *configs.Config, ASCIIFiles embed.FS) ([]string, []string) {

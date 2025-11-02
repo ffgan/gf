@@ -3,21 +3,21 @@ package dev
 import cli "github.com/ffgan/gf/internal/CLI"
 
 func DetectGPU() string {
-	return "GPU: " + getGPU()
+	return getGPU()
 }
 
 func DetectResolution() string {
-	return "Resolution: " + getResolution()
+	return getResolution()
 }
 
 func DetectNetwork() string {
-	return "Network: " + getNetwork(cli.GetOS())
+	return getNetwork(cli.GetOS())
 }
 
 func DetectBluetooth() string {
-	return "Bluetooth: " + getBluetooth()
+	return getBluetooth()
 }
 
 func GetBIOS() string {
-	return "BIOS: " + getBIOS(cli.GetOS())
+	return getBIOS(cli.GetOS())
 }
