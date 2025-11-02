@@ -14,7 +14,7 @@ import (
 func GetInfoLines(config *configs.Config) []string {
 	// TODO: 有些行的信息无法读取的时候，应当不显示
 	// TOOD: 读取配置文件，控制显示的行
-	return []string{
+	lines := []string{
 		cli.GetTitle(),
 		// TODO: 这里数字应该与title长度有关
 		strings.Repeat("-", 10),
@@ -39,9 +39,20 @@ func GetInfoLines(config *configs.Config) []string {
 		Info("Bluetooth", dev.DetectBluetooth()),
 		Info("BIOS", dev.GetBIOS()),
 	}
+	var res []string
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		res = append(res, line)
+	}
+	return res
 }
 
 func Info(name, data string) string {
+	if data == "" {
+		return ""
+	}
 	name = "\033[1;34m" + name + ": \033[0m"
 	return name + data
 }
