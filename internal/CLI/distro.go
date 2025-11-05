@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
@@ -88,11 +90,11 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 		distro = osName + " " + kernelVersion
 	}
 
-	if osArch == "on" {
+	if osArch == utils.ON {
 		distro += " " + kernelMachine
 	}
 
-	if ascii_distro == "auto" {
+	if ascii_distro == utils.AUTO {
 		ascii_distro = strings.TrimSpace(distro)
 	}
 

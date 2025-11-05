@@ -115,11 +115,7 @@ type Song struct {
 }
 
 type TextColor struct {
-	Colors           string `gf:"colors"`
-	Bold             string `gf:"bold"`
-	UnderlineEnabled string `gf:"underline_enabled"`
-	UnderlineChar    string `gf:"underline_char"`
-	Separator        string `gf:"separator"`
+	Colors string `gf:"colors"`
 }
 
 type TextOptions struct {

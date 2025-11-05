@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+const (
+	ON   = "on"
+	OFF  = "off"
+	AUTO = "auto"
+)
+
 func Unquote(s string) string {
 	return strings.Trim(s, `"'`)
 }

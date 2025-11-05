@@ -6,13 +6,25 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) string {
-	return getKernel(osArch, distroShorthand, kernelShorthand, ascii_distro)
+type kernelconfig struct {
+	osArch, distroShorthand, kernelShorthand, ascii_distro string
 }
 
-func getKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) string {
+func GetKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) string {
+	kc := kernelconfig{
+		osArch:          osArch,
+		distroShorthand: distroShorthand,
+		kernelShorthand: kernelShorthand,
+		ascii_distro:    ascii_distro,
+	}
+	return getKernel(kc)
+}
+
+func getKernel(kc kernelconfig) string {
 	var kernel string
 	osName := getOS()
 	kernelVersion := getKernelVersion()
@@ -49,17 +61,18 @@ func getKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) st
 		return kernel
 	}
 	kernelName := getKernelName()
-	// Default case
-	if kernelShorthand == "on" {
+
+	switch kc.kernelShorthand {
+	case utils.ON:
 		kernel = kernelVersion
-	} else if kernelShorthand == "off" {
+	case utils.OFF:
 		kernel = kernelName + " " + kernelVersion
 	}
 
 	// Hide kernel info if identical to distro
-	distro, _ := getDistro(osArch, distroShorthand, ascii_distro)
+	distro, _ := getDistro(kc.osArch, kc.distroShorthand, kc.ascii_distro)
 	if matched, _ := regexp.MatchString(`BSD|MINIX`, osName); matched && strings.Contains(distro, kernelName) {
-		if distroShorthand == "on" || distroShorthand == "tiny" {
+		if kc.distroShorthand == "on" || kc.distroShorthand == "tiny" {
 			kernel = kernelVersion
 		} else {
 			kernel = ""

@@ -1,16 +1,51 @@
 package cli
 
-func GetCPU() string {
-	return getCPU()
+import "github.com/ffgan/gf/internal/utils"
+
+func GetCPU(ShowCores, ShowSpeed, ShowTemp, ShowBrand, CoreType, SpeedShort, TempUnit string) string {
+	var showCores bool
+	var showSpeed bool
+	var showTemp bool
+	var showBrand bool
+	var speedShort bool
+	var tempUnit string // "C" or "F"
+
+	if ShowCores == utils.ON {
+		showCores = true
+	}
+
+	if ShowSpeed == utils.ON {
+		showSpeed = true
+	}
+
+	if ShowTemp == utils.ON {
+		showTemp = true
+	}
+
+	if ShowBrand == utils.ON {
+		showBrand = true
+	}
+
+	if SpeedShort == utils.ON {
+		speedShort = true
+	}
+
+	config := CPUConfig{
+		ShowCores:  showCores,
+		ShowSpeed:  showSpeed,
+		ShowTemp:   showTemp,
+		ShowBrand:  showBrand,
+		CoreType:   CoreType,
+		SpeedShort: speedShort,
+		TempUnit:   tempUnit,
+	}
+
+	return getCPU(config)
 }
 
 func GetDisk() string {
 	return "Disk: " + getDisk()
 }
-
-// func GetMemory() string {
-// 	return "Memory: " + getMemory()
-// }
 
 func DetectPackages() string {
 	// TODO: 修复与hyfetch不一致的地方
@@ -39,9 +74,7 @@ func PrintOS() string {
 	return "OS: " + getOS()
 }
 
-func PrintKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) string {
-	return GetKernel(osArch, distroShorthand, kernelShorthand, ascii_distro)
-}
+var PrintKernel = GetKernel
 
 func PrintHost() string {
 	return getModel()

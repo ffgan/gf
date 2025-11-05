@@ -104,7 +104,9 @@ func DefaultConfig() Config {
 			MPCArgs:       "()",
 		},
 		TextColor: TextColor{
-			Colors:           "(distro)",
+			Colors: "(distro)",
+		},
+		TextOptions: TextOptions{
 			Bold:             "on",
 			UnderlineEnabled: "on",
 			UnderlineChar:    "-",

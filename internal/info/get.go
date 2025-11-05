@@ -32,7 +32,7 @@ func GetInfoLines(config *configs.Config) []string {
 		Info("Icons", gui.GetIcons()),
 		Info("Cursor", gui.GetCursor()),
 		Info("Terminal", cli.GetTerm()),
-		Info("CPU", cli.GetCPU()),
+		Info("CPU", cli.GetCPU(config.CPUCores, config.CPUSpeed, config.CPUTemp, config.CPUBrand, config.SpeedType, config.SpeedShorthand, config.CPUTemp)),
 		Info("GPU", dev.DetectGPU()),
 		Info("Memory", cli.PrintMem(config.Memory, config.ProgressBar)),
 		Info("Network", dev.DetectNetwork()),
