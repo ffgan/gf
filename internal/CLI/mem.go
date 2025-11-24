@@ -12,23 +12,23 @@ import (
 	"github.com/ffgan/gf/configs"
 )
 
-func GetMemory(config *MemoryConfig) (*MemoryInfo, error) {
+func GetMemory(osName string, config *MemoryConfig) (*MemoryInfo, error) {
 	var memUsed, memTotal int64
 	var err error
 
-	switch getOS() {
+	switch osName {
 	case Linux:
 		memUsed, memTotal, err = getMemoryLinux()
 	case Darwin:
 		memUsed, memTotal, err = getMemoryDarwin()
 	case FreeBSD, OpenBSD, NetBSD, DragonFly:
-		memUsed, memTotal, err = getMemoryBSD()
+		memUsed, memTotal, err = getMemoryBSD(osName)
 	case Solaris:
 		memUsed, memTotal, err = getMemorySolaris()
 	case Windows:
 		memUsed, memTotal, err = getMemoryWindows()
 	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", getOS())
+		return nil, fmt.Errorf("unsupported operating system: %s", osName)
 	}
 
 	if err != nil {
@@ -158,9 +158,7 @@ func getMemoryDarwin() (int64, int64, error) {
 	return memUsed, memTotal, nil
 }
 
-func getMemoryBSD() (int64, int64, error) {
-	osName := getOS()
-
+func getMemoryBSD(osName string) (int64, int64, error) {
 	// Get total memory
 	var memTotal int64
 	var err error
@@ -346,7 +344,7 @@ func generateBar(used, total int64, config *MemoryConfig) string {
 	return "[" + bar + "]"
 }
 
-func PrintMem(mem configs.Memory, bar configs.ProgressBar) string {
+func PrintMem(osName string, mem configs.Memory, bar configs.ProgressBar) string {
 	precision, err := strconv.Atoi(mem.MemPrecision)
 	if err != nil {
 		fmt.Printf("failed to parse MemPrecision, %v\n", err)
@@ -377,7 +375,7 @@ func PrintMem(mem configs.Memory, bar configs.ProgressBar) string {
 		BarCharEmpty:  bar.BarCharElapsed,
 	}
 
-	info, err := GetMemory(config)
+	info, err := GetMemory(osName, config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting memory info: %v\n", err)
 		os.Exit(1)

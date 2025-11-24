@@ -1,17 +1,5 @@
 package gui
 
-func GetWM() string {
-	return getWM()
-}
-
-func GetDE() string {
-	return getDE()
-}
-
-func GetTheme() string {
-	return getTheme()
-}
-
 func GetIcons() string {
 	return getIcons()
 }

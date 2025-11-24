@@ -19,10 +19,10 @@ func cleanModelName(model string) string {
 	return model
 }
 
-func getModel() string {
-	osName := getOS()
-	kernelName := getKernelName()
-	kernelMachine := getKernelMachine()
+func GetModel(osName, kernelName, kernelMachine string) string {
+	// osName := getOS()
+	// kernelName := getKernelName()
+	// kernelMachine := getKernelMachine()
 	// TODO: correct this
 	osxVersion := "xx"
 	var model string

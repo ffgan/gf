@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func getTheme() string {
+func GetTheme() string {
 	ctx := StyleContext{
 		Name:      "gtk-theme-name",
 		GSettings: "gtk-theme",

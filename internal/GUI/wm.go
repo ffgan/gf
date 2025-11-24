@@ -10,13 +10,13 @@ import (
 	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func getWM() string {
+func GetWM(osName, kernelName string) string {
 	if wmRun {
 		return wm
 	}
 
-	kernelName := getKernelName()
-	osName := cli.GetOS()
+	// kernelName := getKernelName()
+	// osName := cli.GetOS()
 	xdgRuntime := os.Getenv("XDG_RUNTIME_DIR")
 	waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
 	if waylandDisplay == "" {

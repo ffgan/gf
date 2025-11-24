@@ -11,8 +11,7 @@ import (
 	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func getGPU() string {
-	osName := cli.GetOS()
+func GetGPU(osName string) string {
 	var gpu string
 
 	switch osName {

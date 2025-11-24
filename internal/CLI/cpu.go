@@ -28,8 +28,8 @@ type CPUConfig struct {
 	TempUnit   string // "C" or "F"
 }
 
-func getCPU(config CPUConfig) string {
-	info, err := GetCPUInfo(config)
+func getCPU(OS, Machine string, config CPUConfig) string {
+	info, err := GetCPUInfo(OS, Machine, config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -37,13 +37,13 @@ func getCPU(config CPUConfig) string {
 	return FormatCPUInfo(info, config)
 }
 
-func GetCPUInfo(config CPUConfig) (*CPUInfo, error) {
+func GetCPUInfo(OS, Machine string, config CPUConfig) (*CPUInfo, error) {
 	info := &CPUInfo{
-		OS:      getOS(),
-		Machine: getKernelMachine(),
+		OS:      OS,
+		Machine: Machine,
 	}
 
-	switch getOS() {
+	switch OS {
 	case Linux:
 		return getCPULinux(info, config)
 	case Darwin:
@@ -53,7 +53,7 @@ func GetCPUInfo(config CPUConfig) (*CPUInfo, error) {
 	case Solaris:
 		return getCPUSolaris(info, config)
 	default:
-		return nil, fmt.Errorf("unsupported OS: %s", getOS())
+		return nil, fmt.Errorf("unsupported OS: %s", OS)
 	}
 }
 

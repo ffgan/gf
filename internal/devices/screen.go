@@ -12,15 +12,14 @@ import (
 	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func getResolution() string {
+func GetResolution(osName, machine string) string {
 	var resolution string
-	osName := cli.GetOS()
 
 	switch osName {
 	case cli.MacOS:
 		resolution = getResolutionMac()
 	case cli.Iphone:
-		resolution = getResolutionIOS()
+		resolution = getResolutionIOS(machine)
 	case cli.Windows:
 		resolution = getResolutionWindows()
 	case cli.Haiku:
@@ -110,8 +109,7 @@ func calcScale(res, px string) int {
 }
 
 // --- iOS ---
-func getResolutionIOS() string {
-	machine := cli.GetKernelMachine()
+func getResolutionIOS(machine string) string {
 	// 这里只实现示例映射，可继续扩展
 	table := map[string]string{
 		"iPhone14,7": "1170x2532",

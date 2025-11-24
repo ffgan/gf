@@ -8,16 +8,8 @@ import (
 	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
-	return getDistro(osArch, distroShorthand, ascii_distro)
-}
-
-func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
+func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro string) (string, string) {
 	var distro string
-
-	osName := getOS()
-	kernelMachine := getKernelMachine()
-	kernelVersion := getKernelVersion()
 
 	switch osName {
 	case Linux, BSD, MINIX, Ironclad:
@@ -84,14 +76,21 @@ func getDistro(osArch, distroShorthand, ascii_distro string) (string, string) {
 		distro = readFirstLine("/etc/release")
 	case Haiku:
 		distro = Haiku
-	case AIX:
-		distro = AIX + " " + kernelVersion
+		// case AIX:
+		// 	distro = AIX + " " + kernelVersion
+		// default:
+		// 	distro = osName + " " + kernelVersion
+	}
+	var machine_arch string
+	switch osName {
+	case Solaris, illumos, AIX, Haiku, IRIX, FreeMiNT, BSD, digitalUNIX:
+		machine_arch = UName("-p")
 	default:
-		distro = osName + " " + kernelVersion
+		machine_arch = kernel_machine
 	}
 
-	if osArch == utils.ON {
-		distro += " " + kernelMachine
+	if os_arch == utils.ON {
+		distro += " " + machine_arch
 	}
 
 	if ascii_distro == utils.AUTO {

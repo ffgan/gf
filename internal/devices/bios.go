@@ -8,7 +8,7 @@ import (
 	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func getBIOS(osName string) string {
+func GetBIOS(osName string) string {
 	const dmiPath = "/sys/devices/virtual/dmi/id"
 
 	if !strings.Contains(osName, cli.Linux) {

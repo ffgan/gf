@@ -11,29 +11,33 @@ import (
 )
 
 type kernelconfig struct {
-	osArch, distroShorthand, kernelShorthand, ascii_distro string
+	osArch, distroShorthand, kernelShorthand, ascii_distro, osName, kernelVersion, kernelName, KernelMachine string
 }
 
-func GetKernel(osArch, distroShorthand, kernelShorthand, ascii_distro string) string {
+func GetKernel(osArch, distroShorthand, kernelShorthand, ascii_distro, osName, kernelVersion, kernelName, KernelMachine string) string {
 	kc := kernelconfig{
 		osArch:          osArch,
 		distroShorthand: distroShorthand,
 		kernelShorthand: kernelShorthand,
 		ascii_distro:    ascii_distro,
+		osName:          osName,
+		kernelVersion:   kernelVersion,
+		kernelName:      kernelName,
+		KernelMachine:   KernelMachine,
 	}
 	return getKernel(kc)
 }
 
 func getKernel(kc kernelconfig) string {
 	var kernel string
-	osName := getOS()
-	kernelVersion := getKernelVersion()
+	// osName := getOS()
+	// kernelVersion := getKernelVersion()
 	// Skip for integrated systems
-	if matched, _ := regexp.MatchString(`AIX|IRIX`, osName); matched {
+	if matched, _ := regexp.MatchString(`AIX|IRIX`, kc.osName); matched {
 		return kernel
 	}
 
-	switch osName {
+	switch kc.osName {
 	case Haiku:
 		return getKernelRelease()
 
@@ -55,25 +59,25 @@ func getKernel(kc kernelconfig) string {
 		return kernel
 
 	case Interix:
-		kernel = getKernelVersion() + " " +
-			getKernelMachine() + " " +
+		kernel = kc.kernelVersion + " " +
+			kc.KernelMachine + " " +
 			getKernelRelease()
 		return kernel
 	}
-	kernelName := getKernelName()
+	// kernelName := getKernelName()
 
 	switch kc.kernelShorthand {
 	case utils.ON:
-		kernel = kernelVersion
+		kernel = kc.kernelVersion
 	case utils.OFF:
-		kernel = kernelName + " " + kernelVersion
+		kernel = kc.kernelName + " " + kc.kernelVersion
 	}
 
 	// Hide kernel info if identical to distro
-	distro, _ := getDistro(kc.osArch, kc.distroShorthand, kc.ascii_distro)
-	if matched, _ := regexp.MatchString(`BSD|MINIX`, osName); matched && strings.Contains(distro, kernelName) {
+	distro, _ := GetDistro(kc.osName, kc.osArch, kc.KernelMachine, kc.distroShorthand, kc.ascii_distro)
+	if matched, _ := regexp.MatchString(`BSD|MINIX`, kc.osName); matched && strings.Contains(distro, kc.kernelName) {
 		if kc.distroShorthand == "on" || kc.distroShorthand == "tiny" {
-			kernel = kernelVersion
+			kernel = kc.kernelVersion
 		} else {
 			kernel = ""
 		}
@@ -81,27 +85,27 @@ func getKernel(kc kernelconfig) string {
 	return kernel
 }
 
-func getKernelVersion() string {
-	return uname("-r")
-}
+// func getKernelVersion() string {
+// 	return UName("-r")
+// }
 
-func GetKernelMachine() string {
-	return getKernelMachine()
-}
+// func GetKernelMachine() string {
+// 	return getKernelMachine()
+// }
 
-func getKernelMachine() string {
-	return uname("-m")
-}
+// func getKernelMachine() string {
+// 	return UName("-m")
+// }
 
-func getKernelName() string {
-	return uname("-s")
-}
+// func getKernelName() string {
+// 	return UName("-s")
+// }
 
 func getKernelRelease() string {
-	return uname("-v")
+	return UName("-v")
 }
 
-func uname(command string) string {
+func UName(command string) string {
 	out, err := exec.Command("uname", command).Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to run uname %s: %v\n", command, err)

@@ -9,9 +9,8 @@ import (
 	"time"
 )
 
-func getUptime(uptimeShorthand string) string {
+func getUptime(osName, uptimeShorthand string) string {
 	var s int64
-	osName := getOS()
 
 	switch osName {
 	case Linux, Windows:

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func getEditor(editorPathOpt, editorVersionOpt string) string {
+func GetEditor(editorPathOpt, editorVersionOpt string) string {
 	// function from neofetch's  --> get_editor()
 	editorFullPath := os.Getenv("VISUAL")
 	if editorFullPath == "" {

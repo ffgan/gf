@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// getTerm 负责检测当前终端类型
-func getTerm() string {
+// GetTerm 负责检测当前终端类型
+func GetTerm(osname string) string {
 	if termRun {
 		return term
 	}
@@ -18,7 +18,6 @@ func getTerm() string {
 
 	termProgram := os.Getenv("TERM_PROGRAM")
 	termEnv := os.Getenv("TERM")
-	osType := getOS()
 
 	switch termProgram {
 	case "iTerm.app":
@@ -63,7 +62,7 @@ func getTerm() string {
 			case name == "tmux" || strings.Contains(name, "systemd") || strings.Contains(name, "sshd"):
 				return term
 			default:
-				if osType == "Linux" {
+				if osname == "Linux" {
 					if real, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", parent)); err == nil {
 						term = filepath.Base(real)
 					}
@@ -91,10 +90,10 @@ func getTerm() string {
 	return term
 }
 
-// getTermFont 根据 term 读取配置文件提取字体
-func getTermFont() string {
+// GetTermFont 根据 term 读取配置文件提取字体
+func GetTermFont(osname string) string {
 	if !termRun {
-		getTerm()
+		GetTerm(osname)
 	}
 
 	switch {

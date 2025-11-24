@@ -55,7 +55,7 @@ func stripEscapeCodes(s string) string {
 	return re.ReplaceAllString(s, "")
 }
 
-func PrintASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) (logo []string) {
+func PrintASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) []string {
 	fi, err := os.Stat(imageSource)
 	if err == nil && fi.Mode().IsRegular() {
 		ext := strings.ToLower(filepath.Ext(imageSource))

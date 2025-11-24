@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func getBluetooth() string {
+func GetBluetooth() string {
 	if _, err := exec.LookPath("lsusb"); err != nil {
 		return ""
 	}

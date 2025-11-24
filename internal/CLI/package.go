@@ -43,19 +43,17 @@ func dir(glob string) int {
 	return len(matches)
 }
 
-func get_packages() string {
-	return countPackages()
+func get_packages(osname string) string {
+	return countPackages(osname)
 }
 
-func countPackages() string {
+func countPackages(osname string) string {
 	managers := []PkgInfo{}
 	add := func(manager string, count int) {
 		if count > 0 {
 			managers = append(managers, PkgInfo{manager, count})
 		}
 	}
-
-	osname := getOS()
 
 	// --- Language package managers ---
 	if has("pipx") {

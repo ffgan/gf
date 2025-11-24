@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func getShell(shellPath, shellVersion string) string {
+func GetShell(shellPath, shellVersion string) string {
 	shellEnv := os.Getenv("SHELL")
 	if shellEnv == "" {
 		return ""

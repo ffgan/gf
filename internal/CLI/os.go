@@ -7,18 +7,12 @@ import (
 	"strings"
 )
 
-func GetOS() string {
-	return getOS()
-}
-
-// getOS replicates the logic of the Bash get_os() function.
-func getOS() string {
-	kernelName := getKernelName()
+func GetOS(kernelName, darwin_name string) string {
 	var osName string
 
 	switch {
 	case kernelName == Darwin:
-		osName = getDarwinName()
+		// TODO: https://github.com/ffgan/hyfetch/blob/master/neofetch#L6384
 
 	case kernelName == SunOS:
 		out, err := exec.Command("uname", "-o").Output()
@@ -73,13 +67,4 @@ func getOS() string {
 	}
 
 	return osName
-}
-
-// getDarwinName retrieves a human-friendly macOS name (like "macOS" or "Darwin")
-func getDarwinName() string {
-	out, err := exec.Command("sw_vers", "-productName").Output()
-	if err != nil {
-		return Darwin
-	}
-	return strings.TrimSpace(string(out))
 }

@@ -120,7 +120,28 @@ func getTitle(config TitleConfig) (*TitleInfo, error) {
 // 	fmt.Printf("Length: %d\n", info.Length)
 // }
 
-func GetTitle() string {
+// func GetTitle() string {
+// 	config := TitleConfig{
+// 		TitleFQDN:  false,
+// 		TitleColor: "\033[1;34m", // Blue
+// 		AtColor:    "\033[1;32m", // Green
+// 		Bold:       "\033[1m",    // Bold
+// 	}
+
+// 	info, err := getTitle(config)
+// 	if err != nil {
+// 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+// 		os.Exit(1)
+// 	}
+
+// 	// fmt.Printf("User: %s\n", info.User)
+// 	// fmt.Printf("Hostname: %s\n", info.Hostname)
+// 	// fmt.Printf("Title: %s\033[0m\n", info.Title) // Reset color at end
+// 	// fmt.Printf("Length: %d\n", info.Length)
+// 	return fmt.Sprintf("%s\033[0m", info.Title)
+// }
+
+func GetTitle() (*TitleInfo, error) {
 	config := TitleConfig{
 		TitleFQDN:  false,
 		TitleColor: "\033[1;34m", // Blue
@@ -128,15 +149,5 @@ func GetTitle() string {
 		Bold:       "\033[1m",    // Bold
 	}
 
-	info, err := getTitle(config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// fmt.Printf("User: %s\n", info.User)
-	// fmt.Printf("Hostname: %s\n", info.Hostname)
-	// fmt.Printf("Title: %s\033[0m\n", info.Title) // Reset color at end
-	// fmt.Printf("Length: %d\n", info.Length)
-	return fmt.Sprintf("%s\033[0m", info.Title)
+	return getTitle(config)
 }

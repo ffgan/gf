@@ -9,14 +9,14 @@ import (
 	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func getDE() string {
+func GetDE(osName, distro string) string {
 	if deRun {
 		return de
 	}
 	deRun = true
 
-	osName := cli.GetOS()
-	distro := getDistroName()
+	// osName := cli.GetOS()
+	// distro := getDistroName()
 
 	switch osName {
 	case cli.MacOSX, cli.MacOS:
@@ -56,7 +56,7 @@ func getDE() string {
 
 	default:
 		if !wmRun {
-			getWM()
+			GetWM(osName, getKernelName())
 		}
 
 		desktopSession := os.Getenv("DESKTOP_SESSION")
@@ -91,7 +91,7 @@ func getDE() string {
 		}
 
 		// Remove DE if it's the same as WM
-		wm := getWM()
+		wm := GetWM(osName, getKernelName())
 		if de == wm {
 			de = ""
 			return de

@@ -14,7 +14,7 @@ import (
 	cli "github.com/ffgan/gf/internal/CLI"
 )
 
-func getNetwork(osName string) string {
+func GetNetwork(osName string) string {
 	if strings.Contains(osName, cli.Linux) {
 		return getNetworkLinux()
 	}
