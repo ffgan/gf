@@ -160,24 +160,64 @@ func DefaultConfig() Config {
 func ParseConfig(data string, config *Config) error {
 	lines := strings.Split(data, "\n")
 	real_lines := []string{}
+
+	// preprocess lines: remove comments and empty lines
 	for _, line := range lines {
-		if strings.HasPrefix(line, "#") || len(line) == 0 {
+		if strings.HasPrefix(strings.TrimSpace(line), "#") || len(line) == 0 {
 			continue
 		}
 		real_lines = append(real_lines, line)
 	}
-	var index int
+
+	//
+	print_info_lines_start := -1
 	for i, line := range real_lines {
-		if line == "}" {
-			index = i
+		if line == "print_info() {" {
+			print_info_lines_start = i
 			break
 		}
 	}
-	if index == 0 {
-		return fmt.Errorf("invalid config format")
+	if print_info_lines_start == -1 {
+		return fmt.Errorf("invalid config format,cannot find print_info block's start")
 	}
 
-	config_list := real_lines[index+1:]
+	print_info_lines_end := -1
+	for i, line := range real_lines {
+		if line == "}" {
+			print_info_lines_end = i
+			break
+		}
+	}
+
+	if print_info_lines_end == -1 {
+		return fmt.Errorf("invalid config format,cannot find print_info block's end")
+	}
+
+	for i := print_info_lines_start + 1; i < print_info_lines_end; i++ {
+		var info_line_list []string
+		if strings.Contains(real_lines[i], "\"") {
+			var tmp []string
+			info_line_list = strings.Split(real_lines[i], "\"")
+			for _, item := range info_line_list {
+				item = strings.TrimSpace(item)
+				tmp = append(tmp, item)
+			}
+			info_line_list = tmp
+		} else {
+			info_line_list = strings.Split(real_lines[i], " ")
+		}
+		var tmp []string
+		for _, item := range info_line_list {
+			if item == "" || item == "info" {
+				continue
+			}
+			tmp = append(tmp, strings.ReplaceAll(item, "\"", ""))
+		}
+
+		config.InfoList = append(config.InfoList, tmp)
+	}
+
+	config_list := real_lines[print_info_lines_end+1:]
 
 	t := reflect.ValueOf(config)
 
@@ -190,8 +230,5 @@ func ParseConfig(data string, config *Config) error {
 		value := strings.TrimSpace(parts[1])
 		_ = SetByGFTag(&t, key, value)
 	}
-
-	// fmt.Println(strings.Join(config_list, "\n"))
-
 	return nil
 }

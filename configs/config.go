@@ -25,6 +25,7 @@ type Config struct {
 	ASCIIOptions
 	ImageOptions
 	MiscOptions
+	PrintInfo
 }
 
 type Title struct {
@@ -171,4 +172,8 @@ type ImageOptions struct {
 
 type MiscOptions struct {
 	Stdout string `gf:"stdout"`
+}
+
+type PrintInfo struct {
+	InfoList [][]string `gf:"info_list"`
 }

@@ -35,10 +35,3 @@ func RunCmdCount(cmd string, args ...string) int {
 	}
 	return lines + 1
 }
-
-func MaxLen(a []string, min int) int {
-	if len(a) > min {
-		return len(a)
-	}
-	return min
-}

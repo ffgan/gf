@@ -5,6 +5,7 @@ import (
 
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
+	"github.com/ffgan/gf/internal/info"
 )
 
 func Run(ASCIIFiles embed.FS) {
@@ -15,7 +16,7 @@ func Run(ASCIIFiles embed.FS) {
 	cache_dir := get_cache_dir()
 
 	// load Neofetch default config.
-	config, err := configs.LoadConfig("")
+	config, err := configs.LoadConfig("configs/config")
 	if err != nil {
 		panic(err)
 	}
@@ -46,16 +47,31 @@ func Run(ASCIIFiles embed.FS) {
 	h.Get_bold()
 
 	asciiData := Get_distro_ascii(h.ascii_distro, config.ImageSource, ASCIIFiles)
-	_ = asciiData
+	h.leftMax = info.PrintInfo(asciiData)
 
 	image_backend()
 	old_functions()
 
 	ctx := NewContext(h)
 
-	ctx.info("OS", "os")
-	ctx.info("Kernel", "kernel")
-	ctx.info("BIOS", "bios")
+	for _, line := range config.InfoList {
+		var prefix, func_name string
+		if len(line) == 1 {
+			func_name = line[0]
+		} else if len(line) == 2 {
+			prefix = line[0]
+			func_name = line[1]
+		}
+		ctx.info(prefix, func_name)
+	}
 
 	dynamic_prompt()
+}
+
+func Info(name, data string) string {
+	if data == "" {
+		return ""
+	}
+	name = "\033[1;34m" + name + ": \033[0m"
+	return name + data
 }

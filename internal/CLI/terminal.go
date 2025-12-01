@@ -95,7 +95,6 @@ func GetTermFont(osname string) string {
 	if !termRun {
 		GetTerm(osname)
 	}
-
 	switch {
 	case strings.HasPrefix(term, "alacritty"):
 		conf := findFirstFile([]string{
@@ -134,7 +133,7 @@ func GetTermFont(osname string) string {
 			termFont = "Monospace 12"
 		}
 	default:
-		termFont = ""
+		termFont = "Unknown"
 	}
 	return termFont
 }

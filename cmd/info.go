@@ -3,6 +3,7 @@ package cmd
 import (
 	"embed"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 )
 
 type hardware struct {
+	leftMax   int
 	cache_dir string
 
 	KernelName     string
@@ -67,6 +69,12 @@ type hardware struct {
 
 	ascii_bold string
 	bold       string
+
+	underline string
+	theme     string
+	icons     string
+	cursor    string
+	cols      string
 	configs.Config
 }
 
@@ -105,7 +113,7 @@ func (h *hardware) Get_uptime() {
 	h.uptime = cli.GetUptime(h.os, h.UptimeShorthand)
 }
 
-func (h hardware) Get_packages() {
+func (h *hardware) Get_packages() {
 	h.packages = cli.DetectPackages(h.os)
 }
 
@@ -113,7 +121,7 @@ func (h *hardware) Get_shell() {
 	h.shell = cli.GetShell(h.ShellPath, h.ShellVersion)
 }
 
-func (h hardware) Get_editor() {
+func (h *hardware) Get_editor() {
 	h.editor = cli.GetEditor(h.EditorPath, h.EditorVersion)
 }
 
@@ -167,11 +175,11 @@ func (h *hardware) Get_style() {
 }
 
 func (h *hardware) Get_theme() {
-
+	h.theme = "not implemented"
 }
 
 func (h *hardware) Get_icons() {
-
+	h.icons = "not implemented"
 }
 
 func (h *hardware) Get_font() {
@@ -179,7 +187,7 @@ func (h *hardware) Get_font() {
 }
 
 func (h *hardware) Get_cursor() {
-
+	h.cursor = "not implemented"
 }
 
 func (h *hardware) Get_java_ver() {
@@ -235,7 +243,7 @@ func (h *hardware) Get_gpu_driver() {
 }
 
 func (h *hardware) Get_cols() {
-
+	h.cols = "not implemented"
 }
 
 func (h *hardware) Get_image_source() {
@@ -263,10 +271,15 @@ func (h *hardware) Get_image_size() {
 }
 
 func (h *hardware) Get_underline() {
-
+	switch h.UnderlineEnabled {
+	case "on":
+		h.underline = strings.Repeat("-", 10)
+	case "off":
+		h.underline = ""
+	}
 }
 
-func (h hardware) Get_bold() {
+func (h *hardware) Get_bold() {
 	switch h.ascii_bold {
 	case "on":
 		h.ascii_bold = "\\e[1m"
@@ -283,11 +296,11 @@ func (h hardware) Get_bold() {
 
 }
 
-func (h hardware) Get_full_path() {
+func (h *hardware) Get_full_path() {
 
 }
 
-func (h hardware) Get_user_config() {
+func (h *hardware) Get_user_config() {
 
 }
 
@@ -299,15 +312,15 @@ func get_cache_dir() string {
 	return cacheDir
 }
 
-func (h hardware) Get_ppid() {
+func (h *hardware) Get_ppid() {
 
 }
 
-func (h hardware) Get_process_name() {
+func (h *hardware) Get_process_name() {
 
 }
 
-func (h hardware) Get_args() {
+func (h *hardware) Get_args() {
 
 }
 
@@ -400,14 +413,14 @@ func (c *Context) info(arg1, arg2 string) {
 	}
 
 	output := c.getField(arg2)
-
+	fmt.Printf("\033[%dC", c.target.leftMax)
 	// Print based on conditions
 	if arg2 != "" && strings.TrimSpace(output) != "" {
 		c.prin(arg1, output)
 	} else if strings.TrimSpace(output) != "" {
 		c.prin(output, "")
 	} else {
-		fmt.Println(fmt.Sprintf("Info: Couldn't detect %s.", arg1))
+		log.Printf("Info: Couldn't detect %s.", arg1)
 	}
 
 	// Unset subtitle
