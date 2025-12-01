@@ -3,7 +3,6 @@ package dev
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -40,8 +39,7 @@ func GetResolution(osName, machine string) string {
 // --- macOS ---
 func getResolutionMac() string {
 	tmp := "/tmp/neofetch_system_profiler_SPDisplaysDataType.xml"
-	cmd := exec.Command("system_profiler", "SPDisplaysDataType", "-xml")
-	out, err := cmd.Output()
+	out, err := utils.CommandOutput("system_profiler", "SPDisplaysDataType", "-xml")
 	if err != nil {
 		return ""
 	}
@@ -80,13 +78,12 @@ func getResolutionMac() string {
 }
 
 func plistBuddyExists(plist, key string) bool {
-	cmd := exec.Command("PlistBuddy", "-c", "print "+key, plist)
-	return cmd.Run() == nil
+	_, err := utils.CommandOutput("PlistBuddy", "-c", "print "+key, plist)
+	return err == nil
 }
 
 func runPlistBuddy(plist, key string) string {
-	cmd := exec.Command("PlistBuddy", "-c", "print "+key, plist)
-	out, _ := cmd.Output()
+	out, _ := utils.CommandOutput("PlistBuddy", "-c", "print "+key, plist)
 	return strings.TrimSpace(string(out))
 }
 
@@ -124,8 +121,7 @@ func getResolutionIOS(machine string) string {
 
 // --- Windows ---
 func getResolutionWindows() string {
-	cmdX := exec.Command("wmic", "path", "Win32_VideoController", "get", "CurrentHorizontalResolution,CurrentVerticalResolution")
-	out, err := cmdX.Output()
+	out, err := utils.CommandOutput("wmic", "path", "Win32_VideoController", "get", "CurrentHorizontalResolution,CurrentVerticalResolution")
 	if err != nil {
 		return ""
 	}
@@ -142,8 +138,7 @@ func getResolutionWindows() string {
 
 // --- Haiku ---
 func getResolutionHaiku() string {
-	cmd := exec.Command("screenmode")
-	out, err := cmd.Output()
+	out, err := utils.CommandOutput("screenmode")
 	if err != nil {
 		return ""
 	}
@@ -159,8 +154,7 @@ func getResolutionHaiku() string {
 func getResolutionX11() string {
 	// 优先使用 xrandr
 	if utils.PathExists("xrandr") && os.Getenv("DISPLAY") != "" && os.Getenv("WAYLAND_DISPLAY") == "" {
-		cmd := exec.Command("xrandr", "--nograb", "--current")
-		out, err := cmd.Output()
+		out, err := utils.CommandOutput("xrandr", "--nograb", "--current")
 		if err != nil {
 			return ""
 		}
@@ -177,8 +171,7 @@ func getResolutionX11() string {
 
 	// fallback: xdpyinfo
 	if utils.PathExists("xdpyinfo") && os.Getenv("DISPLAY") != "" {
-		cmd := exec.Command("xdpyinfo")
-		out, err := cmd.Output()
+		out, err := utils.CommandOutput("xdpyinfo")
 		if err == nil {
 			re := regexp.MustCompile(`dimensions:\s+([0-9]+x[0-9]+)`)
 			if m := re.FindStringSubmatch(string(out)); len(m) > 1 {

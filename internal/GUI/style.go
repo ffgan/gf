@@ -40,7 +40,7 @@ func getStyle(ctx StyleContext) string {
 		gtk3 = getGSettings("org.mate.interface", ctx.GSettings)
 		gtk2 = gtk3
 	case strings.Contains(de, "Xfce"):
-		gtk2 = utils.RunCmd("xfconf-query", "-c", "xsettings", "-p", ctx.XfConf)
+		gtk2 = utils.RunCommand("xfconf-query", "-c", "xsettings", "-p", ctx.XfConf)
 	case strings.Contains(de, "LXQt"):
 		qt = readLXQtTheme(ctx.LxQt)
 	case strings.Contains(de, "Fly"):

@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"os/exec"
 	"strconv"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -200,14 +199,11 @@ func getCPULinux(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 
 func getCPUDarwin(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	// Get CPU brand string
-	out, err := exec.Command("sysctl", "-n", "machdep.cpu.brand_string").Output()
-	if err == nil {
-		info.Name = strings.TrimSpace(string(out))
-	}
+	info.Name = utils.RunCommand("sysctl", "-n", "machdep.cpu.brand_string")
 
 	// Fallback to system_profiler
 	if info.Name == "" {
-		out, err := exec.Command("system_profiler", "SPHardwareDataType").Output()
+		out, err := utils.CommandOutput("system_profiler", "SPHardwareDataType")
 		if err == nil {
 			lines := strings.Split(string(out), "\n")
 			for _, line := range lines {
@@ -230,7 +226,7 @@ func getCPUDarwin(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 		sysctlKey = "hw.physicalcpu_max"
 	}
 
-	out, err = exec.Command("sysctl", "-n", sysctlKey).Output()
+	out, err := utils.CommandOutput("sysctl", "-n", sysctlKey)
 	if err == nil {
 		if cores, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
 			info.Cores = cores
@@ -242,13 +238,10 @@ func getCPUDarwin(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 
 func getCPUBSD(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	// Get CPU model
-	out, err := exec.Command("sysctl", "-n", "hw.model").Output()
-	if err == nil {
-		info.Name = strings.TrimSpace(string(out))
-	}
+	info.Name = utils.RunCommand("sysctl", "-n", "hw.model")
 
 	// Get CPU speed
-	out, err = exec.Command("sysctl", "-n", "hw.cpuspeed").Output()
+	out, err := utils.CommandOutput("sysctl", "-n", "hw.cpuspeed")
 	if err == nil {
 		if speed, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
 			info.Speed = speed
@@ -256,7 +249,7 @@ func getCPUBSD(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	}
 
 	// Get CPU cores
-	out, err = exec.Command("sysctl", "-n", "hw.ncpu").Output()
+	out, err = utils.CommandOutput("sysctl", "-n", "hw.ncpu")
 	if err == nil {
 		if cores, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
 			info.Cores = cores
@@ -264,7 +257,7 @@ func getCPUBSD(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	}
 
 	// Get temperature (FreeBSD/OpenBSD)
-	out, _ = exec.Command("sysctl", "-n", "dev.cpu.0.temperature").Output()
+	out, _ = utils.CommandOutput("sysctl", "-n", "dev.cpu.0.temperature")
 	tempStr := strings.TrimSpace(string(out))
 	if tempStr != "" {
 		tempStr = strings.TrimSuffix(tempStr, "C")
@@ -278,7 +271,7 @@ func getCPUBSD(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 
 func getCPUSolaris(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	// Get CPU info
-	out, err := exec.Command("psrinfo", "-pv").Output()
+	out, err := utils.CommandOutput("psrinfo", "-pv")
 	if err == nil {
 		lines := strings.Split(string(out), "\n")
 		if len(lines) > 1 {
@@ -287,7 +280,7 @@ func getCPUSolaris(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	}
 
 	// Get CPU speed
-	out, err = exec.Command("sh", "-c", "psrinfo -v | awk '/operates at/ {print $6; exit}'").Output()
+	out, err = utils.CommandOutput("sh", "-c", "psrinfo -v | awk '/operates at/ {print $6; exit}'")
 	if err == nil {
 		if speed, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
 			info.Speed = speed
@@ -302,7 +295,7 @@ func getCPUSolaris(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 		cmd = "psrinfo -p"
 	}
 
-	out, err = exec.Command("sh", "-c", cmd).Output()
+	out, err = utils.CommandOutput("sh", "-c", cmd)
 	if err == nil {
 		if cores, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
 			info.Cores = cores

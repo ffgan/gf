@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 
@@ -42,7 +41,7 @@ func getKernel(kc kernelconfig) string {
 		return getKernelRelease()
 
 	case Windows:
-		out, _ := exec.Command("wmic", "os", "get", "Version").Output()
+		out, _ := utils.CommandOutput("wmic", "os", "get", "Version")
 		// remove "Version" header and trim
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 		if len(lines) > 1 {
@@ -90,7 +89,7 @@ func getKernelRelease() string {
 }
 
 func UName(command string) string {
-	out, err := exec.Command("uname", command).Output()
+	out, err := utils.CommandOutput("uname", command)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to run uname %s: %v\n", command, err)
 		os.Exit(1)

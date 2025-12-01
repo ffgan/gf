@@ -68,7 +68,7 @@ func GetWM(osName, kernelName string) string {
 	if wm == "" {
 		switch osName {
 		case cli.MacOSX, cli.MacOS:
-			psLine := utils.RunCmd("ps", "-e")
+			psLine := utils.RunCommand("ps", "-e")
 			switch {
 			case strings.Contains(psLine, "chunkwm"):
 				wm = "chunkwm"
@@ -87,7 +87,7 @@ func GetWM(osName, kernelName string) string {
 			}
 
 		case cli.Windows:
-			tasklist := utils.RunCmd("tasklist")
+			tasklist := utils.RunCommand("tasklist")
 			for _, w := range []string{"bugn", "Windawesome", "blackbox", "emerge", "litestep"} {
 				if strings.Contains(tasklist, w) {
 					wm = w
@@ -134,11 +134,11 @@ func GetWM(osName, kernelName string) string {
 
 func tryLsofOrFuser(path string) string {
 	if utils.CommandExists("lsof") {
-		out := utils.RunCmd("lsof", "-t", path)
+		out := utils.RunCommand("lsof", "-t", path)
 		return strings.TrimSpace(out)
 	}
 	if utils.CommandExists("fuser") {
-		out := utils.RunCmd("fuser", path)
+		out := utils.RunCommand("fuser", path)
 		out = strings.TrimSpace(out)
 		parts := strings.Fields(out)
 		if len(parts) > 0 {
@@ -149,7 +149,7 @@ func tryLsofOrFuser(path string) string {
 }
 
 func getRootWindowID() string {
-	out := utils.RunCmd("xprop", "-root", "-notype", "_NET_SUPPORTING_WM_CHECK")
+	out := utils.RunCommand("xprop", "-root", "-notype", "_NET_SUPPORTING_WM_CHECK")
 	fields := strings.Fields(out)
 	if len(fields) > 0 {
 		return fields[len(fields)-1]
@@ -158,7 +158,7 @@ func getRootWindowID() string {
 }
 
 func getWMNameFromXProp(id string) string {
-	out := utils.RunCmd("xprop", "-id", id, "-notype", "-len", "100", "-f", "_NET_WM_NAME", "8t")
+	out := utils.RunCommand("xprop", "-id", id, "-notype", "-len", "100", "-f", "_NET_WM_NAME", "8t")
 	if idx := strings.Index(out, "WM_NAME = "); idx != -1 {
 		val := out[idx+len("WM_NAME = "):]
 		val = strings.Trim(val, "\" \n")

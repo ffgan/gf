@@ -118,7 +118,7 @@ func readQt5ctTheme(key string) string {
 }
 
 func getGSettings(schema, key string) string {
-	out := utils.RunCmd("gsettings", "get", schema, key)
+	out := utils.RunCommand("gsettings", "get", schema, key)
 	return strings.Trim(strings.TrimSpace(out), "'\"")
 }
 

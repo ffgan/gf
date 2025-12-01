@@ -33,8 +33,8 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 	case Linux:
 		if utils.PathExists("/android/system/") || utils.PathExists("/system/app/") {
 			model = fmt.Sprintf("%s %s",
-				utils.RunCmd("getprop", "ro.product.brand"),
-				utils.RunCmd("getprop", "ro.product.model"))
+				utils.RunCommand("getprop", "ro.product.brand"),
+				utils.RunCommand("getprop", "ro.product.model"))
 		} else if utils.PathExists("/sys/devices/virtual/dmi/id/product_name") ||
 			utils.PathExists("/sys/devices/virtual/dmi/id/product_version") {
 			model = utils.ReadFileTrim("/sys/devices/virtual/dmi/id/product_name") + " " +
@@ -50,27 +50,27 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 		}
 
 	case MacOSX, MacOS, RavynOS:
-		arch := utils.RunCmd("arch")
+		arch := utils.RunCommand("arch")
 		isHackintosh := false
 		if arch != "arm64" {
-			out := utils.RunCmd("kextstat")
+			out := utils.RunCommand("kextstat")
 			if strings.Contains(out, "FakeSMC") || strings.Contains(out, "VirtualSMC") {
 				isHackintosh = true
 			}
 		}
 
 		if isHackintosh {
-			model = fmt.Sprintf("Hackintosh (SMBIOS: %s)", utils.RunCmd("sysctl", "-n", "hw.model"))
+			model = fmt.Sprintf("Hackintosh (SMBIOS: %s)", utils.RunCommand("sysctl", "-n", "hw.model"))
 		} else {
 			if strings.HasPrefix(osxVersion, "10.4") || strings.HasPrefix(osxVersion, "10.5") {
-				line := utils.RunCmd("system_profiler", "SPHardwareDataType")
+				line := utils.RunCommand("system_profiler", "SPHardwareDataType")
 				re := regexp.MustCompile(`Machine Name:\s*(.+)`)
 				m := re.FindStringSubmatch(line)
 				if len(m) > 1 {
-					model = fmt.Sprintf("%s (%s)", strings.TrimSpace(m[1]), utils.RunCmd("sysctl", "-n", "hw.model"))
+					model = fmt.Sprintf("%s (%s)", strings.TrimSpace(m[1]), utils.RunCommand("sysctl", "-n", "hw.model"))
 				}
 			} else {
-				model = utils.RunCmd("sysctl", "-n", "hw.model")
+				model = utils.RunCommand("sysctl", "-n", "hw.model")
 			}
 		}
 
@@ -87,40 +87,40 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 
 	case BSD, MINIX:
 		if kernelName == "FreeBSD" {
-			model = utils.RunCmd("kenv", "smbios.system.version")
+			model = utils.RunCommand("kenv", "smbios.system.version")
 		} else {
-			model = utils.RunCmd("sysctl", "-n", "hw.vendor", "hw.product")
+			model = utils.RunCommand("sysctl", "-n", "hw.vendor", "hw.product")
 		}
 
 	case Windows:
-		model = utils.RunCmd("wmic", "computersystem", "get", "manufacturer,model")
+		model = utils.RunCommand("wmic", "computersystem", "get", "manufacturer,model")
 		model = strings.ReplaceAll(model, "Manufacturer", "")
 		model = strings.ReplaceAll(model, "Model", "")
 
 	case Solaris, illumos:
-		model = utils.RunCmd("prtconf", "-b")
+		model = utils.RunCommand("prtconf", "-b")
 		re := regexp.MustCompile(`banner-name:\s*(.+)`)
 		m := re.FindStringSubmatch(model)
 		if len(m) > 1 {
 			model = strings.TrimSpace(m[1])
 		}
-		virt := utils.RunCmd("/usr/bin/uname", "-V")
+		virt := utils.RunCommand("/usr/bin/uname", "-V")
 		if virt != "" && virt != "non-virtualized" {
 			if model == "" {
-				model = utils.RunCmd("uname", "-i")
+				model = utils.RunCommand("uname", "-i")
 			}
 			model = fmt.Sprintf("%s (%s)", model, virt)
 		}
 
 	case AIX:
-		model = utils.RunCmd("/usr/bin/uname", "-M")
+		model = utils.RunCommand("/usr/bin/uname", "-M")
 
 	case FreeMiNT:
-		model = utils.RunCmd("sysctl", "-n", "hw.model")
+		model = utils.RunCommand("sysctl", "-n", "hw.model")
 		model = strings.ReplaceAll(model, "(_MCH *)", "")
 
 	case Interix:
-		model = utils.RunCmd("/dev/fs/C/Windows/System32/wbem/WMIC.exe", "computersystem", "get", "manufacturer,model")
+		model = utils.RunCommand("/dev/fs/C/Windows/System32/wbem/WMIC.exe", "computersystem", "get", "manufacturer,model")
 		model = strings.ReplaceAll(model, "Manufacturer", "")
 		model = strings.ReplaceAll(model, "Model", "")
 	}

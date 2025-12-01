@@ -1,14 +1,13 @@
 package dev
 
 import (
-	"os/exec"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetBluetooth() string {
-	if _, err := exec.LookPath("lsusb"); err != nil {
+	if !utils.CommandExists("lsusb") {
 		return ""
 	}
 

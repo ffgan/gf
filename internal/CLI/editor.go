@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -21,7 +19,7 @@ func GetEditor(editorPathOpt, editorVersionOpt string) string {
 		return ""
 	}
 
-	cmdPath, err := exec.LookPath(editorFullPath)
+	cmdPath, err := utils.LookPath(editorFullPath)
 	if err != nil {
 		return ""
 	}
@@ -48,7 +46,6 @@ func GetEditor(editorPathOpt, editorVersionOpt string) string {
 	}
 
 	editorName := filepath.Base(editorFullPath)
-	var out bytes.Buffer
 
 	var args []string
 	switch editorName {
@@ -62,12 +59,7 @@ func GetEditor(editorPathOpt, editorVersionOpt string) string {
 		return strings.TrimSpace(editor)
 	}
 
-	cmd := exec.Command(editorFullPath, args...)
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	_ = cmd.Run()
-
-	editorV := strings.TrimSpace(out.String())
+	editorV := utils.RunCommand(editorFullPath, args...)
 	if idx := strings.Index(editorV, "\n"); idx != -1 {
 		editorV = editorV[:idx]
 	}

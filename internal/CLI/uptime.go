@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +27,7 @@ func GetUptime(osName, uptimeShorthand string) string {
 		}
 
 		// Fallback using uptime -s
-		bootStr, err1 := exec.Command("uptime", "-s").Output()
+		bootStr, err1 := utils.CommandOutput("uptime", "-s")
 		now := time.Now().Unix()
 		if err1 == nil {
 			if bootTime, err := time.Parse("2006-01-02 15:04:05", strings.TrimSpace(string(bootStr))); err == nil {
@@ -37,7 +36,7 @@ func GetUptime(osName, uptimeShorthand string) string {
 		}
 
 	case Darwin, FreeBSD, NetBSD, OpenBSD:
-		out, err := exec.Command("sysctl", "-n", "kern.boottime").Output()
+		out, err := utils.CommandOutput("sysctl", "-n", "kern.boottime")
 		if err == nil {
 			line := strings.TrimSpace(string(out))
 			line = strings.TrimPrefix(line, "{ sec = ")
@@ -48,7 +47,7 @@ func GetUptime(osName, uptimeShorthand string) string {
 		}
 
 	case Solaris:
-		out, err := exec.Command("kstat", "-p", "unix:0:system_misc:boot_time").Output()
+		out, err := utils.CommandOutput("kstat", "-p", "unix:0:system_misc:boot_time")
 		if err == nil {
 			fields := strings.Fields(string(out))
 			if len(fields) == 2 {
@@ -60,14 +59,15 @@ func GetUptime(osName, uptimeShorthand string) string {
 
 	default:
 		// Try a generic fallback with "ps -o etime"
-		var cmd *exec.Cmd
+		var out []byte
+		var err error
+
 		if osName == AIX || osName == IRIX || osName == Ironclad {
-			cmd = exec.Command("ps", "-o", "etime=", "-p", "1")
+			out, err = utils.CommandOutput("ps", "-o", "etime=", "-p", "1")
 		} else {
-			cmd = exec.Command("ps", "-o", "etime=", "-p", "0")
+			out, err = utils.CommandOutput("ps", "-o", "etime=", "-p", "0")
 		}
 
-		out, err := cmd.Output()
 		if err == nil {
 			t := strings.TrimSpace(string(out))
 			t = strings.TrimSuffix(t, "\n")

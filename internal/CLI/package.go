@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -36,8 +35,7 @@ func DetectPackages(osname string) string {
 		add("pip", utils.GetPkgCount("pip", "freeze"))
 	}
 	if utils.CommandExists("cargo") {
-		cmd := exec.Command("cargo", "install", "--list")
-		out, _ := cmd.Output()
+		out, _ := utils.CommandOutput("cargo", "install", "--list")
 		lines := 0
 		sc := bufio.NewScanner(bytes.NewReader(out))
 		for sc.Scan() {
@@ -53,7 +51,7 @@ func DetectPackages(osname string) string {
 		} else if st, err := os.Stat("/usr/local/lib/node_modules"); err == nil && st.IsDir() {
 			add("npm", utils.FilePathGlobLens("/usr/local/lib/node_modules/*/"))
 		} else {
-			out, err := exec.Command("npm", "root", "-g").Output()
+			out, err := utils.CommandOutput("npm", "root", "-g")
 			if err == nil {
 				root := strings.TrimSpace(string(out))
 				add("npm", utils.FilePathGlobLens(filepath.Join(root, "*/")))
@@ -87,7 +85,7 @@ func DetectPackages(osname string) string {
 			add("snap", utils.GetPkgCount("snap", "list"))
 		}
 		if utils.CommandExists("brew") {
-			root, err := exec.Command("brew", "--cellar").Output()
+			root, err := utils.CommandOutput("brew", "--cellar")
 			if err == nil {
 				p1 := strings.TrimSpace(string(root)) + "/*"
 				add("brew", utils.FilePathGlobLens(p1))

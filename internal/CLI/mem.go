@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -130,8 +129,7 @@ func getMemoryDarwin() (int64, int64, error) {
 	}
 
 	// Get vm_stat output for wired and compressed pages
-	cmd := exec.Command("vm_stat")
-	output, err := cmd.Output()
+	output, err := utils.CommandOutput("vm_stat")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -209,21 +207,11 @@ func getMemorySolaris() (int64, int64, error) {
 	}
 
 	// Get total pages
-	cmd := exec.Command("kstat", "-p", "unix:0:system_pages:pagestotal")
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, 0, err
-	}
-	fields := strings.Fields(string(output))
+	fields := strings.Fields(utils.RunCommand("kstat", "-p", "unix:0:system_pages:pagestotal"))
 	pagesTotal, _ := strconv.ParseInt(fields[len(fields)-1], 10, 64)
 
 	// Get free pages
-	cmd = exec.Command("kstat", "-p", "unix:0:system_pages:pagesfree")
-	output, err = cmd.Output()
-	if err != nil {
-		return 0, 0, err
-	}
-	fields = strings.Fields(string(output))
+	fields = strings.Fields(utils.RunCommand("kstat", "-p", "unix:0:system_pages:pagesfree"))
 	pagesFree, _ := strconv.ParseInt(fields[len(fields)-1], 10, 64)
 
 	memTotal := pagesTotal * pageSize / 1024
@@ -240,32 +228,17 @@ func getMemoryWindows() (int64, int64, error) {
 }
 
 func sysctlInt64(name string) (int64, error) {
-	cmd := exec.Command("sysctl", "-n", name)
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-	value, err := strconv.ParseInt(strings.TrimSpace(string(output)), 10, 64)
+	value, err := strconv.ParseInt(strings.TrimSpace(utils.RunCommand("sysctl", "-n", name)), 10, 64)
 	return value, err
 }
 
 func getPageSize() (int64, error) {
-	cmd := exec.Command("pagesize")
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-	value, err := strconv.ParseInt(strings.TrimSpace(string(output)), 10, 64)
+	value, err := strconv.ParseInt(strings.TrimSpace(utils.RunCommand("pagesize")), 10, 64)
 	return value, err
 }
 
 func getVmstatValue(column int) int64 {
-	cmd := exec.Command("vmstat")
-	output, err := cmd.Output()
-	if err != nil {
-		return 0
-	}
-	lines := strings.Split(string(output), "\n")
+	lines := strings.Split(utils.RunCommand("vmstat"), "\n")
 	if len(lines) < 3 {
 		return 0
 	}

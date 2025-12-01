@@ -3,8 +3,9 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetOS(kernelName, darwin_name string) string {
@@ -15,7 +16,7 @@ func GetOS(kernelName, darwin_name string) string {
 		// TODO: https://github.com/ffgan/hyfetch/blob/master/neofetch#L6384
 
 	case kernelName == SunOS:
-		out, err := exec.Command("uname", "-o").Output()
+		out, err := utils.CommandOutput("uname", "-o")
 		if err == nil && strings.Contains(string(out), illumos) {
 			osName = illumos
 		} else {

@@ -24,7 +24,7 @@ func detectDesktopEnvironment() string {
 		return de
 	}
 	// Fallback: 检查进程名
-	out := utils.RunCmd("ps", "-e")
+	out := utils.RunCommand("ps", "-e")
 	switch {
 	case strings.Contains(out, "plasmashell"):
 		return "KDE"
@@ -128,7 +128,7 @@ func GetDE(osName, distro, kernel_name string) string {
 
 	// Try xprop as fallback
 	if de == "" && os.Getenv("DISPLAY") != "" && utils.CommandExists("xprop") {
-		out := utils.CommandOutput("xprop", "-root")
+		out := utils.RunCommand("xprop", "-root")
 		if strings.Contains(out, "KDE_SESSION_VERSION") {
 			de = "KDE"
 		} else if strings.Contains(out, "xfce4") {
@@ -187,31 +187,31 @@ func getDEVersion(name string) (string, string, string) {
 	var deVer, kfVer, qtVer string
 	switch {
 	case strings.HasPrefix(name, "Plasma6"):
-		deVer = utils.CommandOutput("plasmashell", "--version")
-		kinfo := utils.CommandOutput("kinfo")
+		deVer = utils.RunCommand("plasmashell", "--version")
+		kinfo := utils.RunCommand("kinfo")
 		kfVer, qtVer = parseKFQt(kinfo)
 
 	case strings.HasPrefix(name, "Plasma"):
-		deVer = utils.CommandOutput("plasmashell", "--version")
-		kinfo := utils.CommandOutput("kf5-config", "--version")
+		deVer = utils.RunCommand("plasmashell", "--version")
+		kinfo := utils.RunCommand("kf5-config", "--version")
 		kfVer, qtVer = parseKFQt(kinfo)
 
 	case strings.HasPrefix(name, "MATE"):
-		deVer = utils.CommandOutput("mate-session", "--version")
+		deVer = utils.RunCommand("mate-session", "--version")
 	case strings.HasPrefix(name, "Xfce"):
-		deVer = utils.CommandOutput("xfce4-session", "--version")
+		deVer = utils.RunCommand("xfce4-session", "--version")
 	case strings.HasPrefix(name, "GNOME"):
-		deVer = utils.CommandOutput("gnome-shell", "--version")
+		deVer = utils.RunCommand("gnome-shell", "--version")
 	case strings.HasPrefix(name, "Cinnamon"):
-		deVer = utils.CommandOutput("cinnamon", "--version")
+		deVer = utils.RunCommand("cinnamon", "--version")
 	case strings.HasPrefix(name, "Budgie"):
-		deVer = utils.CommandOutput("budgie-desktop", "--version")
+		deVer = utils.RunCommand("budgie-desktop", "--version")
 	case strings.HasPrefix(name, "LXQt"):
-		deVer = utils.CommandOutput("lxqt-session", "--version")
+		deVer = utils.RunCommand("lxqt-session", "--version")
 	case strings.HasPrefix(name, "Trinity"):
-		deVer = utils.CommandOutput("tde-config", "--version")
+		deVer = utils.RunCommand("tde-config", "--version")
 	case strings.HasPrefix(name, "Unity"):
-		deVer = utils.CommandOutput("unity", "--version")
+		deVer = utils.RunCommand("unity", "--version")
 	}
 	return utils.Trim(deVer), utils.Trim(kfVer), utils.Trim(qtVer)
 }

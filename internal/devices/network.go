@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -43,7 +42,7 @@ func getNetworkLinux() string {
 			networks = append(networks, "Wifi")
 			phy, err := os.ReadFile(filepath.Join(ifacePath, "phy80211", "name"))
 			if err == nil {
-				out, _ := exec.Command("iw", strings.TrimSpace(string(phy)), "info").Output()
+				out, _ := utils.CommandOutput("iw", strings.TrimSpace(string(phy)), "info")
 				if bytes.Contains(out, []byte("VHT Capabilities")) {
 					networks = append(networks, "6")
 				}
@@ -84,7 +83,7 @@ func getNetworkMac() string {
 
 	if activeName == "Wi-Fi" {
 		tmp := "/tmp/neofetch_system_profiler_SPAirPortDataType.xml"
-		_ = exec.Command("system_profiler", "-detailLevel", "basic", "-xml", "SPAirPortDataType").Run()
+		utils.RunCommand("system_profiler", "-detailLevel", "basic", "-xml", "SPAirPortDataType")
 
 		phyMode = plistBuddyPrint(tmp, "0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:spairport_network_phymode")
 		linkSpeed = plistBuddyPrint(tmp, "0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:spairport_network_rate")
@@ -112,11 +111,7 @@ func getNetworkMac() string {
 }
 
 func plistBuddyPrint(file, key string) string {
-	out, err := exec.Command("PlistBuddy", "-c", "Print "+key, file).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
+	return utils.RunCommand("PlistBuddy", "-c", "Print "+key, file)
 }
 
 func formatNetworks(list []string) string {
