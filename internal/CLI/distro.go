@@ -14,7 +14,7 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 	switch osName {
 	case Linux, BSD, MINIX, Ironclad:
 		switch {
-		case FileExists("/etc/os-release"):
+		case utils.FileExists("/etc/os-release"):
 			// Try to parse /etc/os-release
 			content, _ := os.ReadFile("/etc/os-release")
 			lines := strings.Split(string(content), "\n")
@@ -28,24 +28,24 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 			name := info["NAME"]
 			version := info["VERSION_ID"]
 			switch distroShorthand {
-			case "on":
+			case utils.ON:
 				distro = fmt.Sprintf("%s %s", name, version)
 			case "tiny":
 				distro = name
 			default:
 				distro = fmt.Sprintf("%s %s", name, version)
 			}
-		case FileExists("/etc/debian_version"):
-			ver := readFirstLine("/etc/debian_version")
+		case utils.FileExists("/etc/debian_version"):
+			ver := utils.ReadFirstLine("/etc/debian_version")
 			distro = "Debian " + ver
-		case FileExists("/etc/redhat-release"):
-			ver := readFirstLine("/etc/redhat-release")
+		case utils.FileExists("/etc/redhat-release"):
+			ver := utils.ReadFirstLine("/etc/redhat-release")
 			distro = "Red Hat " + ver
 		default:
 			distro = "Linux"
 		}
 	case Darwin:
-		out := RunCommand("sw_vers", "-productVersion")
+		out := utils.RunCommand("sw_vers", "-productVersion")
 		codename := "macOS"
 		version := out
 		switch {
@@ -64,8 +64,8 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 	case Windows:
 		// For Windows, use PowerShell to query ProductName
 		psCmd := `Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object -ExpandProperty ProductName`
-		out := RunCommand("powershell", "-Command", psCmd)
-		build := RunCommand("powershell", "-Command", "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty CurrentBuildNumber")
+		out := utils.RunCommand("powershell", "-Command", psCmd)
+		build := utils.RunCommand("powershell", "-Command", "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty CurrentBuildNumber")
 		distro = strings.TrimSpace(out)
 		if strings.Contains(distro, "Windows 10") {
 			if buildInt := strings.TrimSpace(build); buildInt >= "22000" {
@@ -73,7 +73,7 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 			}
 		}
 	case Solaris:
-		distro = readFirstLine("/etc/release")
+		distro = utils.ReadFirstLine("/etc/release")
 	case Haiku:
 		distro = Haiku
 		// case AIX:

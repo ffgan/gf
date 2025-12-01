@@ -3,6 +3,8 @@ package dev
 import (
 	"os/exec"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetBluetooth() string {
@@ -10,7 +12,7 @@ func GetBluetooth() string {
 		return ""
 	}
 
-	out := execOutput("lsusb")
+	out := utils.ExecOutput("lsusb")
 	lines := strings.Split(out, "\n")
 	var bluetooths []string
 	for _, l := range lines {

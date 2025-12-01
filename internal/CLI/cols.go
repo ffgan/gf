@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 // ColorBlocksParams holds all parameters needed for generating color blocks
@@ -92,7 +94,7 @@ func GetCols(params ColorBlocksParams, leftMax int) ColorBlocksResult {
 
 	// Determine the horizontal offset of the blocks
 	var blockOffset int
-	if params.ColOffset == "auto" {
+	if params.ColOffset == utils.AUTO {
 		blockOffset = params.TextPadding
 	} else {
 		fmt.Sscanf(params.ColOffset, "%d", &blockOffset)
@@ -139,7 +141,7 @@ func Getcols(leftMax int) string {
 		BlockWidth:  3,
 		BlockHeight: 1,
 		BlockRange:  [2]int{0, 15}, // Display colors 0-15
-		ColOffset:   "auto",
+		ColOffset:   utils.AUTO,
 		TextPadding: 0,
 		Term:        "xterm-256color",
 		BashVersion: 5,

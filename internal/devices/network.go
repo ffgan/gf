@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetNetwork(osName string) string {
@@ -62,7 +63,7 @@ func getNetworkMac() string {
 	var network string
 
 	// 获取当前活动网络接口
-	activeIface := execOutput(`route`, `get`, `default`)
+	activeIface := utils.ExecOutput(`route`, `get`, `default`)
 	reIface := regexp.MustCompile(`interface: (\w+)`)
 	matches := reIface.FindStringSubmatch(activeIface)
 	if len(matches) < 2 {
@@ -71,7 +72,7 @@ func getNetworkMac() string {
 	activeNetwork := matches[1]
 
 	// 解析接口名称
-	hwPorts := execOutput(`networksetup`, `-listallhardwareports`)
+	hwPorts := utils.ExecOutput(`networksetup`, `-listallhardwareports`)
 	rePort := regexp.MustCompile(`Hardware Port: (.+)\nDevice: ` + activeNetwork)
 	portMatch := rePort.FindStringSubmatch(hwPorts)
 	var activeName string
@@ -91,7 +92,7 @@ func getNetworkMac() string {
 			linkSpeed += " Mbps"
 		}
 	} else {
-		out := execOutput(`ifconfig`, activeNetwork)
+		out := utils.ExecOutput(`ifconfig`, activeNetwork)
 		reMedia := regexp.MustCompile(`media:.*\(([^)]+)\)`)
 		match := reMedia.FindStringSubmatch(out)
 		if len(match) > 1 {
@@ -108,11 +109,6 @@ func getNetworkMac() string {
 	}
 
 	return network
-}
-
-func execOutput(name string, args ...string) string {
-	out, _ := exec.Command(name, args...).CombinedOutput()
-	return string(out)
 }
 
 func plistBuddyPrint(file, key string) string {

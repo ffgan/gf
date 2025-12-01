@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetEditor(editorPathOpt, editorVersionOpt string) string {
@@ -33,15 +35,15 @@ func GetEditor(editorPathOpt, editorVersionOpt string) string {
 
 	var editor string
 	switch editorPathOpt {
-	case "on":
+	case utils.ON:
 		editor = editorFullPath + " "
-	case "off":
+	case utils.OFF:
 		editor = filepath.Base(editorFullPath) + " "
 	default:
 		editor = editorFullPath + " "
 	}
 
-	if editorVersionOpt != "on" {
+	if editorVersionOpt != utils.ON {
 		return strings.TrimSpace(editor)
 	}
 

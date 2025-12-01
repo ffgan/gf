@@ -5,6 +5,8 @@ import (
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func LoadConfig(fileName string) (*Config, error) {
@@ -33,56 +35,56 @@ func LoadConfig(fileName string) (*Config, error) {
 func DefaultConfig() Config {
 	return Config{
 		Title: Title{
-			TitleFqdn: "off",
+			TitleFqdn: utils.OFF,
 		},
 		Kernel: Kernel{
-			KernelShorthand: "on",
+			KernelShorthand: utils.ON,
 		},
 		Distro: Distro{
-			DistroShorthand: "off",
-			OSArch:          "on",
+			DistroShorthand: utils.OFF,
+			OSArch:          utils.ON,
 		},
 		Uptime: Uptime{
-			UptimeShorthand: "on",
+			UptimeShorthand: utils.ON,
 		},
 		Memory: Memory{
-			MemoryPercent: "on",
+			MemoryPercent: utils.ON,
 			MemoryUnit:    "gib",
 			MemPrecision:  "2",
 		},
 		Packages: Packages{
-			PackageManagers: "on",
-			PackageSeparate: "on",
+			PackageManagers: utils.ON,
+			PackageSeparate: utils.ON,
 			PackageMinimal:  "",
 		},
 		Shell: Shell{
-			ShellPath:    "off",
-			ShellVersion: "on",
+			ShellPath:    utils.OFF,
+			ShellVersion: utils.ON,
 		},
 		Editor: Editor{
-			EditorPath:    "off",
-			EditorVersion: "on",
+			EditorPath:    utils.OFF,
+			EditorVersion: utils.ON,
 		},
 		CPU: CPU{
 			SpeedType:      "bios_limit",
-			SpeedShorthand: "on",
-			CPUBrand:       "on",
-			CPUSpeed:       "on",
+			SpeedShorthand: utils.ON,
+			CPUBrand:       utils.ON,
+			CPUSpeed:       utils.ON,
 			CPUCores:       "logical",
-			CPUTemp:        "off",
+			CPUTemp:        utils.OFF,
 		},
 		GPU: GPU{
-			GPUBrand: "on",
+			GPUBrand: utils.ON,
 			GPUType:  "all",
 		},
 		Resolution: Resolution{
-			RefreshRate: "on",
+			RefreshRate: utils.ON,
 		},
 		GTK: GTK{
-			GTKShorthand: "off",
-			GTK2:         "on",
-			GTK3:         "on",
-			QT:           "on",
+			GTKShorthand: utils.OFF,
+			GTK2:         utils.ON,
+			GTK3:         utils.ON,
+			QT:           utils.ON,
 		},
 		IPAddress: IPAddress{
 			PublicIPHost:     "http://ident.me",
@@ -90,61 +92,61 @@ func DefaultConfig() Config {
 			LocalIPInterface: "('auto')",
 		},
 		DE: DE{
-			DeVersion: "on",
+			DeVersion: utils.ON,
 		},
 		Disk: Disk{
 			DiskShow:     "('/')",
 			DiskSubtitle: "mount",
-			DiskPercent:  "on",
+			DiskPercent:  utils.ON,
 		},
 		Song: Song{
-			MusicPlayer:   "auto",
+			MusicPlayer:   utils.AUTO,
 			SongFormat:    "%artist% - %album% - %title%",
-			SongShorthand: "off",
+			SongShorthand: utils.OFF,
 			MPCArgs:       "()",
 		},
 		TextColor: TextColor{
 			Colors: "(distro)",
 		},
 		TextOptions: TextOptions{
-			Bold:             "on",
-			UnderlineEnabled: "on",
+			Bold:             utils.ON,
+			UnderlineEnabled: utils.ON,
 			UnderlineChar:    "-",
 			Separator:        ":",
 		},
 		ColorBlocks: ColorBlocks{
 			BlockRange:  "(0 15)",
-			ColorBlocks: "on",
+			ColorBlocks: utils.ON,
 			BlockWidth:  "3",
 			BlockHeight: "1",
-			ColOffset:   "auto",
+			ColOffset:   utils.AUTO,
 		},
 		ProgressBar: ProgressBar{
 			BarCharElapsed:  "-",
 			BarCharTotal:    "=",
-			BarBorder:       "on",
+			BarBorder:       utils.ON,
 			BarLength:       "15",
 			BarColorElapsed: "distro",
 			BarColorTotal:   "distro",
-			MemoryDisplay:   "off",
-			BatteryDisplay:  "off",
-			DiskDisplay:     "off",
+			MemoryDisplay:   utils.OFF,
+			BatteryDisplay:  utils.OFF,
+			DiskDisplay:     utils.OFF,
 		},
 		BackendSettings: BackendSettings{
 			ImageBackend: "ascii",
-			ImageSource:  "auto",
+			ImageSource:  utils.AUTO,
 		},
 		ASCIIOptions: ASCIIOptions{
-			ASCIIDistro: "auto",
+			ASCIIDistro: utils.AUTO,
 			ASCIIColors: "(distro)",
-			ASCIIBold:   "on",
+			ASCIIBold:   utils.ON,
 		},
 		ImageOptions: ImageOptions{
-			ImageLoop:       "off",
+			ImageLoop:       utils.OFF,
 			ThumbnailDir:    "${XDG_CACHE_HOME:-${HOME}/.cache}/thumbnails/neofetch",
 			CropMode:        "normal",
 			CropOffset:      "center",
-			ImageSize:       "auto",
+			ImageSize:       utils.AUTO,
 			CatimgSize:      "2",
 			Gap:             "3",
 			Yoffset:         "0",
@@ -152,7 +154,7 @@ func DefaultConfig() Config {
 			BackgroundColor: "",
 		},
 		MiscOptions: MiscOptions{
-			Stdout: "auto",
+			Stdout: utils.AUTO,
 		},
 		PrintInfo: PrintInfo{
 			InfoList: [][]string{
@@ -199,27 +201,25 @@ func ParseConfig(data string, config *Config) error {
 	}
 
 	print_info_lines_start := -1
+	print_info_lines_end := -1
+
 	for i, line := range real_lines {
 		if line == "print_info() {" {
 			print_info_lines_start = i
-			break
 		}
-	}
-	if print_info_lines_start == -1 {
-		return fmt.Errorf("invalid config format,cannot find print_info block's start")
-	}
-
-	print_info_lines_end := -1
-	for i, line := range real_lines {
 		if line == "}" {
 			print_info_lines_end = i
-			break
 		}
+	}
+
+	if print_info_lines_start == -1 {
+		return fmt.Errorf("invalid config format,cannot find print_info block's start")
 	}
 
 	if print_info_lines_end == -1 {
 		return fmt.Errorf("invalid config format,cannot find print_info block's end")
 	}
+
 	if config.InfoList == nil {
 		for i := print_info_lines_start + 1; i < print_info_lines_end; i++ {
 			var info_line_list []string

@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 var (
@@ -22,7 +24,7 @@ var (
 	gap             = 2
 	Reset           = "\033[0m" // reset terminal color
 	asciiBold       = "\033[1m"
-	colorText       = "on"
+	colorText       = utils.ON
 	barColorElapsed = "distro"
 	barColorTotal   = "distro"
 	colors          = []string{"distro"}
@@ -67,7 +69,7 @@ func PrintASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) []string {
 				asciiData = string(data)
 			}
 		}
-	} else if imageSource == "ascii" || imageSource == "auto" {
+	} else if imageSource == "ascii" || imageSource == utils.AUTO {
 		getDistroASCII(ASCIIDistro, ASCIIFiles)
 	} else {
 		asciiData = imageSource
@@ -97,7 +99,7 @@ func PrintASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) []string {
 	// Fallback
 	if lines == 1 {
 		lines = 0
-		imageSource = "auto"
+		imageSource = utils.AUTO
 		getDistroASCII(ASCIIDistro, ASCIIFiles)
 		PrintASCII(ASCIIDistro, imageSource, ASCIIFiles)
 		return nil
@@ -153,7 +155,7 @@ func setColors(args_ints ...int) {
 		}
 	}
 
-	if colorText != "off" {
+	if colorText != utils.OFF {
 		setTextColors(args...)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
 	"github.com/ffgan/gf/internal/info"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 const neofetch_conf = "/etc/neofetch/default.conf"
@@ -18,7 +19,7 @@ func Run(ASCIIFiles embed.FS) {
 	cache_dir := get_cache_dir()
 
 	var file_path string
-	if cli.FileExists(neofetch_conf) == true {
+	if utils.FileExists(neofetch_conf) == true {
 		// load Neofetch default config.
 		file_path = neofetch_conf
 	}

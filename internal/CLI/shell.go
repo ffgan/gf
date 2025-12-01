@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetShell(shellPath, shellVersion string) string {
@@ -16,14 +18,14 @@ func GetShell(shellPath, shellVersion string) string {
 
 	var shell string
 	switch shellPath {
-	case "on":
+	case utils.ON:
 		shell = shellEnv + " "
-	case "off":
+	case utils.OFF:
 		shell = filepath.Base(shellEnv) + " "
 	}
 
 	// If version output is disabled, return early
-	if shellVersion != "on" {
+	if shellVersion != utils.ON {
 		return shell
 	}
 

@@ -14,6 +14,7 @@ import (
 	gui "github.com/ffgan/gf/internal/GUI"
 	dev "github.com/ffgan/gf/internal/devices"
 	"github.com/ffgan/gf/internal/logo"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 type hardware struct {
@@ -126,7 +127,7 @@ func (h *hardware) Get_editor() {
 }
 
 func (h *hardware) Get_de() {
-	h.de = gui.GetDE(h.os, h.distro)
+	h.de = gui.GetDE(h.os, h.distro, h.KernelName)
 }
 
 func (h *hardware) Get_wm() {
@@ -138,13 +139,13 @@ func (h *hardware) Get_wm_theme() {
 }
 
 func (h *hardware) Get_cpu() {
-	if h.CPUTemp == "off" {
+	if h.CPUTemp == utils.OFF {
 		h.cpu = cli.GetCPU(h.os, h.KernelMachine, h.CPUCores, h.CPUSpeed, h.CPUTemp, h.CPUBrand, h.SpeedType, h.SpeedShorthand, h.CPUTemp)
 	}
-	if h.CPUTemp == "on" {
+	if h.CPUTemp == utils.ON {
 		h.CPUTemp = "C"
 	}
-	h.cpu = cli.GetCPU(h.os, h.KernelMachine, h.CPUCores, h.CPUSpeed, "on", h.CPUBrand, h.SpeedType, h.SpeedShorthand, h.CPUTemp)
+	h.cpu = cli.GetCPU(h.os, h.KernelMachine, h.CPUCores, h.CPUSpeed, utils.ON, h.CPUBrand, h.SpeedType, h.SpeedShorthand, h.CPUTemp)
 }
 
 func (h *hardware) Get_gpu() {
@@ -272,25 +273,25 @@ func (h *hardware) Get_image_size() {
 
 func (h *hardware) Get_underline() {
 	switch h.UnderlineEnabled {
-	case "on":
+	case utils.ON:
 		h.underline = strings.Repeat("-", 10)
-	case "off":
+	case utils.OFF:
 		h.underline = ""
 	}
 }
 
 func (h *hardware) Get_bold() {
 	switch h.ascii_bold {
-	case "on":
+	case utils.ON:
 		h.ascii_bold = "\\e[1m"
-	case "off":
+	case utils.OFF:
 		h.ascii_bold = ""
 	}
 
 	switch h.bold {
-	case "on":
+	case utils.ON:
 		h.bold = "\\e[1m"
-	case "off":
+	case utils.OFF:
 		h.bold = ""
 	}
 

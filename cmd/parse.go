@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/ffgan/gf/configs"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 const Version = "0.0.1"
@@ -373,7 +374,7 @@ func setupArgs(config *configs.Config) {
 # C:   'Intel i7-6500U (4) @ 3.1GHz [27.2°C]'
 # F:   'Intel i7-6500U (4) @ 3.1GHz [82.0°F]'
 # off: 'Intel i7-6500U (4) @ 3.1GHz'`)
-	if config.CPUTemp == "on" {
+	if config.CPUTemp == utils.ON {
 		config.CPUTemp = "C"
 	}
 
@@ -499,7 +500,7 @@ func setupArgs(config *configs.Config) {
 # begin printing the columns, in case you want to e.g. center them under your
 # text.
 # Example:
-# col_offset="auto" - Default behavior of neofetch
+# col_offset=utils.AUTO - Default behavior of neofetch
 # col_offset=7      - Leave 7 spaces then print the colors`)
 
 	// Bars
@@ -678,11 +679,11 @@ func setupArgs(config *configs.Config) {
 	// Other
 	// TODO: 需要特殊处理
 	// --config
-	flag.StringVar(&no_config, "no_config", "off", "Don't create the user config file.")
+	flag.StringVar(&no_config, "no_config", utils.OFF, "Don't create the user config file.")
 	flag.StringVar(&config.Stdout, "stdout", config.Stdout, "Turn off all colors and disables any ASCII/image backend.")
-	flag.StringVar(&verbose, "v", "on", "Display error messages.")
-	flag.StringVar(&print_config, "print_config", "on", "Print the default config file to stdout.")
-	flag.StringVar(&vverbose, "vv", "on", "Display a verbose log for error reporting.")
+	flag.StringVar(&verbose, "v", utils.ON, "Display error messages.")
+	flag.StringVar(&print_config, "print_config", utils.ON, "Print the default config file to stdout.")
+	flag.StringVar(&vverbose, "vv", utils.ON, "Display a verbose log for error reporting.")
 
 	// --help
 

@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 type PkgInfo struct {
@@ -15,39 +17,10 @@ type PkgInfo struct {
 	Count   int
 }
 
-func has(cmd string) bool {
-	_, err := exec.LookPath(cmd)
-	return err == nil
-}
-
-func tot(cmd ...string) int {
-	out, err := exec.Command(cmd[0], cmd[1:]...).Output()
-	if err != nil {
-		return 0
-	}
-	lines := bytes.Count(out, []byte{'\n'})
-	return lines
-}
-
-func totSafe(cmd ...string) int {
-	out, err := exec.Command(cmd[0], cmd[1:]...).Output()
-	if err != nil {
-		return 0
-	}
-	lines := bytes.Count(out, []byte{'\n'})
-	return lines
-}
-
-func dir(glob string) int {
-	matches, _ := filepath.Glob(glob)
-	return len(matches)
-}
-
-func get_packages(osname string) string {
-	return countPackages(osname)
-}
-
-func countPackages(osname string) string {
+func DetectPackages(osname string) string {
+	// TODO: 修复与hyfetch不一致的地方
+	// Packages: 227 (pip), 2699 (rpm), 25 (flatpak)
+	// Packages: 227 (pip), 2699 (rpm), 19 (flatpak-system), 6 (flatpak-user)
 	managers := []PkgInfo{}
 	add := func(manager string, count int) {
 		if count > 0 {
@@ -56,13 +29,13 @@ func countPackages(osname string) string {
 	}
 
 	// --- Language package managers ---
-	if has("pipx") {
-		add("pipx", tot("pipx", "list", "--short"))
+	if utils.CommandExists("pipx") {
+		add("pipx", utils.GetPkgCount("pipx", "list", "--short"))
 	}
-	if has("pip") {
-		add("pip", tot("pip", "freeze"))
+	if utils.CommandExists("pip") {
+		add("pip", utils.GetPkgCount("pip", "freeze"))
 	}
-	if has("cargo") {
+	if utils.CommandExists("cargo") {
 		cmd := exec.Command("cargo", "install", "--list")
 		out, _ := cmd.Output()
 		lines := 0
@@ -74,69 +47,69 @@ func countPackages(osname string) string {
 		}
 		add("cargo", lines)
 	}
-	if has("npm") {
+	if utils.CommandExists("npm") {
 		if st, err := os.Stat("/usr/lib/node_modules"); err == nil && st.IsDir() {
-			add("npm", dir("/usr/lib/node_modules/*/"))
+			add("npm", utils.FilePathGlobLens("/usr/lib/node_modules/*/"))
 		} else if st, err := os.Stat("/usr/local/lib/node_modules"); err == nil && st.IsDir() {
-			add("npm", dir("/usr/local/lib/node_modules/*/"))
+			add("npm", utils.FilePathGlobLens("/usr/local/lib/node_modules/*/"))
 		} else {
 			out, err := exec.Command("npm", "root", "-g").Output()
 			if err == nil {
 				root := strings.TrimSpace(string(out))
-				add("npm", dir(filepath.Join(root, "*/")))
+				add("npm", utils.FilePathGlobLens(filepath.Join(root, "*/")))
 			}
 		}
 	}
-	if has("pnpm") {
+	if utils.CommandExists("pnpm") {
 		p := filepath.Join(os.Getenv("HOME"), ".local/share/pnpm/global/5/node_modules/*/")
-		add("pnpm", dir(p))
+		add("pnpm", utils.FilePathGlobLens(p))
 	}
 
 	// --- System package managers by OS ---
 	switch osname {
 	case Linux:
-		if has("dpkg") {
-			add("dpkg", tot("dpkg-query", "-f", ".\\n", "-W"))
+		if utils.CommandExists("dpkg") {
+			add("dpkg", utils.GetPkgCount("dpkg-query", "-f", ".\\n", "-W"))
 		}
-		if has("pacman") {
-			add("pacman", tot("pacman", "-Qq", "--color", "never"))
+		if utils.CommandExists("pacman") {
+			add("pacman", utils.GetPkgCount("pacman", "-Qq", "--color", "never"))
 		}
-		if has("apk") {
-			add("apk", tot("apk", "info"))
+		if utils.CommandExists("apk") {
+			add("apk", utils.GetPkgCount("apk", "info"))
 		}
-		if has("rpm") {
-			add("rpm", tot("rpm", "-qa", "--nodigest", "--nosignature"))
+		if utils.CommandExists("rpm") {
+			add("rpm", utils.GetPkgCount("rpm", "-qa", "--nodigest", "--nosignature"))
 		}
-		if has("flatpak") {
-			add("flatpak", tot("flatpak", "list"))
+		if utils.CommandExists("flatpak") {
+			add("flatpak", utils.GetPkgCount("flatpak", "list"))
 		}
-		if has("snap") {
-			add("snap", tot("snap", "list"))
+		if utils.CommandExists("snap") {
+			add("snap", utils.GetPkgCount("snap", "list"))
 		}
-		if has("brew") {
+		if utils.CommandExists("brew") {
 			root, err := exec.Command("brew", "--cellar").Output()
 			if err == nil {
 				p1 := strings.TrimSpace(string(root)) + "/*"
-				add("brew", dir(p1))
+				add("brew", utils.FilePathGlobLens(p1))
 			}
 		}
 	case Darwin:
-		if has("brew") {
-			add("brew", dir("/usr/local/Cellar/*/"))
+		if utils.CommandExists("brew") {
+			add("brew", utils.FilePathGlobLens("/usr/local/Cellar/*/"))
 		}
-		if has("port") {
-			add("macports", tot("port", "installed"))
+		if utils.CommandExists("port") {
+			add("macports", utils.GetPkgCount("port", "installed"))
 		}
 	case Windows:
-		if has("choco") {
+		if utils.CommandExists("choco") {
 			pdata := os.Getenv("ProgramData")
 			if pdata == "" {
 				pdata = `C:\ProgramData`
 			}
-			add("choco", dir(filepath.Join(pdata, "chocolatey/lib/*")))
+			add("choco", utils.FilePathGlobLens(filepath.Join(pdata, "chocolatey/lib/*")))
 		}
-		if has("winget") {
-			add("winget", tot("winget", "list", "--accept-source-agreements"))
+		if utils.CommandExists("winget") {
+			add("winget", utils.GetPkgCount("winget", "list", "--accept-source-agreements"))
 		}
 	}
 

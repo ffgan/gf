@@ -7,7 +7,50 @@ import (
 
 	"os/exec"
 	"strconv"
+
+	"github.com/ffgan/gf/internal/utils"
 )
+
+func GetCPU(OS, Machine, ShowCores, ShowSpeed, ShowTemp, ShowBrand, CoreType, SpeedShort, TempUnit string) string {
+	var showCores bool
+	var showSpeed bool
+	var showTemp bool
+	var showBrand bool
+	var speedShort bool
+	var tempUnit string // "C" or "F"
+
+	if ShowCores == utils.ON {
+		showCores = true
+	}
+
+	if ShowSpeed == utils.ON {
+		showSpeed = true
+	}
+
+	if ShowTemp == utils.ON {
+		showTemp = true
+	}
+
+	if ShowBrand == utils.ON {
+		showBrand = true
+	}
+
+	if SpeedShort == utils.ON {
+		speedShort = true
+	}
+
+	config := CPUConfig{
+		ShowCores:  showCores,
+		ShowSpeed:  showSpeed,
+		ShowTemp:   showTemp,
+		ShowBrand:  showBrand,
+		CoreType:   CoreType,
+		SpeedShort: speedShort,
+		TempUnit:   tempUnit,
+	}
+
+	return getCPU(OS, Machine, config)
+}
 
 type CPUInfo struct {
 	Name        string

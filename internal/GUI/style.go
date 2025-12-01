@@ -1,18 +1,10 @@
 package gui
 
 import (
-	"bytes"
 	"os"
-	"os/exec"
 	"strings"
-)
 
-var (
-	deRun     bool
-	de        string
-	deVersion string
-	wmRun     bool
-	wm        string
+	"github.com/ffgan/gf/internal/utils"
 )
 
 type StyleContext struct {
@@ -24,41 +16,6 @@ type StyleContext struct {
 	LxQt      string
 	Qt5ct     string
 	Fly       string
-}
-
-func pathExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-func trim(s string) string {
-	return strings.TrimSpace(s)
-}
-
-func commandOutput(name string, args ...string) string {
-	out, err := exec.Command(name, args...).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
-
-func commandExists(cmd string) bool {
-	_, err := exec.LookPath(cmd)
-	return err == nil
-}
-
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
-}
-
-func runCmd(cmd string, args ...string) string {
-	c := exec.Command(cmd, args...)
-	var buf bytes.Buffer
-	c.Stdout = &buf
-	_ = c.Run()
-	return buf.String()
 }
 
 func getStyle(ctx StyleContext) string {
@@ -83,7 +40,7 @@ func getStyle(ctx StyleContext) string {
 		gtk3 = getGSettings("org.mate.interface", ctx.GSettings)
 		gtk2 = gtk3
 	case strings.Contains(de, "Xfce"):
-		gtk2 = runCmd("xfconf-query", "-c", "xsettings", "-p", ctx.XfConf)
+		gtk2 = utils.RunCmd("xfconf-query", "-c", "xsettings", "-p", ctx.XfConf)
 	case strings.Contains(de, "LXQt"):
 		qt = readLXQtTheme(ctx.LxQt)
 	case strings.Contains(de, "Fly"):

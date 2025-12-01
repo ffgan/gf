@@ -76,7 +76,7 @@ func getKernel(kc kernelconfig) string {
 	// Hide kernel info if identical to distro
 	distro, _ := GetDistro(kc.osName, kc.osArch, kc.KernelMachine, kc.distroShorthand, kc.ascii_distro)
 	if matched, _ := regexp.MatchString(`BSD|MINIX`, kc.osName); matched && strings.Contains(distro, kc.kernelName) {
-		if kc.distroShorthand == "on" || kc.distroShorthand == "tiny" {
+		if kc.distroShorthand == utils.ON || kc.distroShorthand == "tiny" {
 			kernel = kc.kernelVersion
 		} else {
 			kernel = ""
@@ -84,22 +84,6 @@ func getKernel(kc kernelconfig) string {
 	}
 	return kernel
 }
-
-// func getKernelVersion() string {
-// 	return UName("-r")
-// }
-
-// func GetKernelMachine() string {
-// 	return getKernelMachine()
-// }
-
-// func getKernelMachine() string {
-// 	return UName("-m")
-// }
-
-// func getKernelName() string {
-// 	return UName("-s")
-// }
 
 func getKernelRelease() string {
 	return UName("-v")

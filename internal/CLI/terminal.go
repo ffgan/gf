@@ -3,9 +3,15 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
+)
+
+var (
+	termRun bool
+	term    string
 )
 
 // GetTerm 负责检测当前终端类型
@@ -46,7 +52,7 @@ func GetTerm(osname string) string {
 	if term == "" {
 		parent := os.Getppid()
 		for term == "" && parent > 1 {
-			name := getProcessName(parent)
+			name := utils.GetProcessName(string(parent))
 			switch {
 			case strings.Contains(name, "gnome-terminal-"):
 				term = "gnome-terminal"
@@ -75,7 +81,7 @@ func GetTerm(osname string) string {
 					term = strings.TrimSuffix(term, "-wrapped")
 				}
 			}
-			parent = getParentPID(parent)
+			parent = utils.GetParentPID(parent)
 		}
 	}
 
@@ -136,34 +142,3 @@ func GetTerm(osname string) string {
 // 	}
 // 	return termFont
 // }
-
-func getParentPID(pid int) int {
-	out, err := exec.Command("ps", "-o", "ppid=", "-p", fmt.Sprint(pid)).Output()
-	if err != nil {
-		return 0
-	}
-	s := strings.TrimSpace(string(out))
-	if s == "" {
-		return 0
-	}
-	var p int
-	fmt.Sscanf(s, "%d", &p)
-	return p
-}
-
-func getProcessName(pid int) string {
-	out, err := exec.Command("ps", "-p", fmt.Sprint(pid), "-o", "comm=").Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
-
-func findFirstFile(paths []string) string {
-	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
-}

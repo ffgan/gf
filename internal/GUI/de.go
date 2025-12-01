@@ -7,16 +7,44 @@ import (
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
+	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetDE(osName, distro string) string {
+var (
+	deRun     bool
+	de        string
+	deVersion string
+	wmRun     bool
+	wm        string
+)
+
+func detectDesktopEnvironment() string {
+	// 优先使用 XDG_CURRENT_DESKTOP
+	if de := os.Getenv("XDG_CURRENT_DESKTOP"); de != "" {
+		return de
+	}
+	// Fallback: 检查进程名
+	out := utils.RunCmd("ps", "-e")
+	switch {
+	case strings.Contains(out, "plasmashell"):
+		return "KDE"
+	case strings.Contains(out, "gnome-shell"):
+		return "Gnome"
+	case strings.Contains(out, "cinnamon"):
+		return "Cinnamon"
+	case strings.Contains(out, "xfce"):
+		return "Xfce"
+	case strings.Contains(out, "lxqt"):
+		return "LXQt"
+	}
+	return "Unknown"
+}
+
+func GetDE(osName, distro, kernel_name string) string {
 	if deRun {
 		return de
 	}
 	deRun = true
-
-	// osName := cli.GetOS()
-	// distro := getDistroName()
 
 	switch osName {
 	case cli.MacOSX, cli.MacOS:
@@ -56,7 +84,7 @@ func GetDE(osName, distro string) string {
 
 	default:
 		if !wmRun {
-			GetWM(osName, getKernelName())
+			GetWM(osName, kernel_name)
 		}
 
 		desktopSession := os.Getenv("DESKTOP_SESSION")
@@ -91,7 +119,7 @@ func GetDE(osName, distro string) string {
 		}
 
 		// Remove DE if it's the same as WM
-		wm := GetWM(osName, getKernelName())
+		wm := GetWM(osName, kernel_name)
 		if de == wm {
 			de = ""
 			return de
@@ -99,8 +127,8 @@ func GetDE(osName, distro string) string {
 	}
 
 	// Try xprop as fallback
-	if de == "" && os.Getenv("DISPLAY") != "" && commandExists("xprop") {
-		out := commandOutput("xprop", "-root")
+	if de == "" && os.Getenv("DISPLAY") != "" && utils.CommandExists("xprop") {
+		out := utils.CommandOutput("xprop", "-root")
 		if strings.Contains(out, "KDE_SESSION_VERSION") {
 			de = "KDE"
 		} else if strings.Contains(out, "xfce4") {
@@ -136,7 +164,7 @@ func GetDE(osName, distro string) string {
 	}
 
 	// Add version info if available
-	if deVersion == "on" && de != "" {
+	if deVersion == utils.ON && de != "" {
 		deVer, kfVer, qtVer := getDEVersion(de)
 		if deVer != "" {
 			if strings.HasPrefix(de, "Plasma") {
@@ -159,33 +187,33 @@ func getDEVersion(name string) (string, string, string) {
 	var deVer, kfVer, qtVer string
 	switch {
 	case strings.HasPrefix(name, "Plasma6"):
-		deVer = commandOutput("plasmashell", "--version")
-		kinfo := commandOutput("kinfo")
+		deVer = utils.CommandOutput("plasmashell", "--version")
+		kinfo := utils.CommandOutput("kinfo")
 		kfVer, qtVer = parseKFQt(kinfo)
 
 	case strings.HasPrefix(name, "Plasma"):
-		deVer = commandOutput("plasmashell", "--version")
-		kinfo := commandOutput("kf5-config", "--version")
+		deVer = utils.CommandOutput("plasmashell", "--version")
+		kinfo := utils.CommandOutput("kf5-config", "--version")
 		kfVer, qtVer = parseKFQt(kinfo)
 
 	case strings.HasPrefix(name, "MATE"):
-		deVer = commandOutput("mate-session", "--version")
+		deVer = utils.CommandOutput("mate-session", "--version")
 	case strings.HasPrefix(name, "Xfce"):
-		deVer = commandOutput("xfce4-session", "--version")
+		deVer = utils.CommandOutput("xfce4-session", "--version")
 	case strings.HasPrefix(name, "GNOME"):
-		deVer = commandOutput("gnome-shell", "--version")
+		deVer = utils.CommandOutput("gnome-shell", "--version")
 	case strings.HasPrefix(name, "Cinnamon"):
-		deVer = commandOutput("cinnamon", "--version")
+		deVer = utils.CommandOutput("cinnamon", "--version")
 	case strings.HasPrefix(name, "Budgie"):
-		deVer = commandOutput("budgie-desktop", "--version")
+		deVer = utils.CommandOutput("budgie-desktop", "--version")
 	case strings.HasPrefix(name, "LXQt"):
-		deVer = commandOutput("lxqt-session", "--version")
+		deVer = utils.CommandOutput("lxqt-session", "--version")
 	case strings.HasPrefix(name, "Trinity"):
-		deVer = commandOutput("tde-config", "--version")
+		deVer = utils.CommandOutput("tde-config", "--version")
 	case strings.HasPrefix(name, "Unity"):
-		deVer = commandOutput("unity", "--version")
+		deVer = utils.CommandOutput("unity", "--version")
 	}
-	return trim(deVer), trim(kfVer), trim(qtVer)
+	return utils.Trim(deVer), utils.Trim(kfVer), utils.Trim(qtVer)
 }
 
 func parseKFQt(info string) (kfVer, qtVer string) {
@@ -198,16 +226,4 @@ func parseKFQt(info string) (kfVer, qtVer string) {
 		}
 	}
 	return
-}
-
-func getDistroName() string {
-	if pathExists("/etc/os-release") {
-		data, _ := os.ReadFile("/etc/os-release")
-		for _, line := range strings.Split(string(data), "\n") {
-			if strings.HasPrefix(line, "PRETTY_NAME=") {
-				return strings.Trim(line[13:], "\"")
-			}
-		}
-	}
-	return ""
 }

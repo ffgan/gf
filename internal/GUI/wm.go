@@ -1,13 +1,12 @@
 package gui
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetWM(osName, kernelName string) string {
@@ -37,10 +36,10 @@ func GetWM(osName, kernelName string) string {
 		if fi, err := os.Stat(socket); err == nil && fi.Mode()&os.ModeSocket != 0 {
 			tmpPid := tryLsofOrFuser(socket)
 			if tmpPid != "" {
-				wm = getProcessName(tmpPid)
+				wm = utils.GetProcessName(tmpPid)
 			} else {
 				// fallback: scan known wayland wms
-				wm = scanProcesses(psFlags, []string{
+				wm = utils.ScanProcesses(psFlags, []string{
 					"arcan", "asc", "clayland", "dwc", "dwl", "fireplace",
 					"gnome-shell", "greenfield", "grefsen", "hikari", "Hyprland",
 					"kwin", "lipstick", "maynard", "mazecompositor", "motorcar",
@@ -54,10 +53,10 @@ func GetWM(osName, kernelName string) string {
 
 	// --- X11 detection ---
 	if wm == "" && display != "" && osName != cli.MacOSX && osName != cli.MacOS && osName != cli.FreeMiNT {
-		wm = scanProcesses(psFlags, []string{
+		wm = utils.ScanProcesses(psFlags, []string{
 			"sowm", "catwm", "fvwm", "dwm", "2bwm", "monsterwm", "tinywm", "x11fs", "xmonad",
 		})
-		if wm == "" && commandExists("xprop") {
+		if wm == "" && utils.CommandExists("xprop") {
 			id := getRootWindowID()
 			if id != "" {
 				wm = getWMNameFromXProp(id)
@@ -69,7 +68,7 @@ func GetWM(osName, kernelName string) string {
 	if wm == "" {
 		switch osName {
 		case cli.MacOSX, cli.MacOS:
-			psLine := runCmd("ps", "-e")
+			psLine := utils.RunCmd("ps", "-e")
 			switch {
 			case strings.Contains(psLine, "chunkwm"):
 				wm = "chunkwm"
@@ -88,7 +87,7 @@ func GetWM(osName, kernelName string) string {
 			}
 
 		case cli.Windows:
-			tasklist := runCmd("tasklist")
+			tasklist := utils.RunCmd("tasklist")
 			for _, w := range []string{"bugn", "Windawesome", "blackbox", "emerge", "litestep"} {
 				if strings.Contains(tasklist, w) {
 					wm = w
@@ -133,18 +132,13 @@ func GetWM(osName, kernelName string) string {
 	return wm
 }
 
-func getKernelName() string {
-	out := runCmd("uname", "-s")
-	return strings.TrimSpace(out)
-}
-
 func tryLsofOrFuser(path string) string {
-	if commandExists("lsof") {
-		out := runCmd("lsof", "-t", path)
+	if utils.CommandExists("lsof") {
+		out := utils.RunCmd("lsof", "-t", path)
 		return strings.TrimSpace(out)
 	}
-	if commandExists("fuser") {
-		out := runCmd("fuser", path)
+	if utils.CommandExists("fuser") {
+		out := utils.RunCmd("fuser", path)
 		out = strings.TrimSpace(out)
 		parts := strings.Fields(out)
 		if len(parts) > 0 {
@@ -154,25 +148,8 @@ func tryLsofOrFuser(path string) string {
 	return ""
 }
 
-func getProcessName(pid string) string {
-	out := runCmd("ps", "-p", pid, "-ho", "comm=")
-	return strings.TrimSpace(out)
-}
-
-func scanProcesses(psFlags []string, names []string) string {
-	args := append([]string{}, psFlags...)
-	out := runCmd("ps", args...)
-	for _, n := range names {
-		re := regexp.MustCompile(fmt.Sprintf(`(?m)^%s$`, regexp.QuoteMeta(n)))
-		if re.FindString(out) != "" {
-			return n
-		}
-	}
-	return ""
-}
-
 func getRootWindowID() string {
-	out := runCmd("xprop", "-root", "-notype", "_NET_SUPPORTING_WM_CHECK")
+	out := utils.RunCmd("xprop", "-root", "-notype", "_NET_SUPPORTING_WM_CHECK")
 	fields := strings.Fields(out)
 	if len(fields) > 0 {
 		return fields[len(fields)-1]
@@ -181,7 +158,7 @@ func getRootWindowID() string {
 }
 
 func getWMNameFromXProp(id string) string {
-	out := runCmd("xprop", "-id", id, "-notype", "-len", "100", "-f", "_NET_WM_NAME", "8t")
+	out := utils.RunCmd("xprop", "-id", id, "-notype", "-len", "100", "-f", "_NET_WM_NAME", "8t")
 	if idx := strings.Index(out, "WM_NAME = "); idx != -1 {
 		val := out[idx+len("WM_NAME = "):]
 		val = strings.Trim(val, "\" \n")

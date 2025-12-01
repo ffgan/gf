@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetGPU(osName string) string {
@@ -27,28 +28,28 @@ func GetGPU(osName string) string {
 		gpu = getWindowsGPU()
 
 	case cli.FreeBSD, cli.DragonFly:
-		out := cli.RunCommand("pciconf", "-lv")
+		out := utils.RunCommand("pciconf", "-lv")
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "device") {
-				gpu = cli.Trim(strings.SplitN(line, "=", 2)[1])
+				gpu = utils.Trim(strings.SplitN(line, "=", 2)[1])
 				break
 			}
 		}
 
 	default:
 		// Fallback: Try OpenGL
-		out := cli.RunCommand("glxinfo", "-B")
+		out := utils.RunCommand("glxinfo", "-B")
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "OpenGL renderer string") {
 				gpu = strings.TrimPrefix(line, "OpenGL renderer string:")
-				gpu = cli.Trim(gpu)
+				gpu = utils.Trim(gpu)
 				break
 			}
 		}
 	}
 
 	// Optional: remove brand names if disabled
-	if os.Getenv("GPU_BRAND") == "off" {
+	if os.Getenv("GPU_BRAND") == utils.OFF {
 		gpu = strings.ReplaceAll(gpu, "AMD", "")
 		gpu = strings.ReplaceAll(gpu, "NVIDIA", "")
 		gpu = strings.ReplaceAll(gpu, "Intel", "")
@@ -58,7 +59,7 @@ func GetGPU(osName string) string {
 }
 
 func getLinuxGPU() string {
-	out := cli.RunCommand("lspci", "-mm")
+	out := utils.RunCommand("lspci", "-mm")
 	if out == "" {
 		return parseGLXInfo()
 	}
@@ -192,8 +193,8 @@ func getLinuxGPU() string {
 			continue
 		}
 
-		// Optional: Remove brand prefix if gpu_brand is "off"
-		// if c.config.GPUBrand == "off" {
+		// Optional: Remove brand prefix if gpu_brand is utils.OFF
+		// if c.config.GPUBrand == utils.OFF {
 		//     gpu = strings.TrimPrefix(gpu, "AMD ")
 		//     gpu = strings.TrimPrefix(gpu, "NVIDIA ")
 		//     gpu = strings.TrimPrefix(gpu, "Intel ")
@@ -210,10 +211,10 @@ func getLinuxGPU() string {
 }
 
 func parseGLXInfo() string {
-	out := cli.RunCommand("glxinfo", "-B")
+	out := utils.RunCommand("glxinfo", "-B")
 	for _, line := range strings.Split(out, "\n") {
 		if strings.Contains(line, "OpenGL renderer string") {
-			return cli.Trim(strings.TrimPrefix(line, "OpenGL renderer string:"))
+			return utils.Trim(strings.TrimPrefix(line, "OpenGL renderer string:"))
 		}
 	}
 	return ""
@@ -221,8 +222,8 @@ func parseGLXInfo() string {
 
 func getMacGPU() string {
 	// macOS ARM (Apple Silicon)
-	if cli.RunCommand("uname", "-m") == "arm64" {
-		chip := cli.RunCommand("system_profiler", "SPDisplaysDataType")
+	if utils.RunCommand("uname", "-m") == "arm64" {
+		chip := utils.RunCommand("system_profiler", "SPDisplaysDataType")
 		chipset := parseSystemProfiler(chip, "Chipset Model")
 		cores := parseSystemProfiler(chip, "Total Number of Cores")
 		if chipset != "" {
@@ -231,7 +232,7 @@ func getMacGPU() string {
 	}
 
 	// Intel mac
-	out := cli.RunCommand("system_profiler", "SPDisplaysDataType")
+	out := utils.RunCommand("system_profiler", "SPDisplaysDataType")
 	return parseSystemProfiler(out, "Chipset Model")
 }
 
@@ -253,10 +254,10 @@ func parseSystemProfiler(data, key string) string {
 }
 
 func getWindowsGPU() string {
-	out := cli.RunCommand("wmic", "path", "Win32_VideoController", "get", "caption")
+	out := utils.RunCommand("wmic", "path", "Win32_VideoController", "get", "caption")
 	var gpus []string
 	for _, line := range strings.Split(out, "\n") {
-		line = cli.Trim(line)
+		line = utils.Trim(line)
 		if line == "" || strings.Contains(line, "Caption") {
 			continue
 		}

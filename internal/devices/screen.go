@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetResolution(osName, machine string) string {
@@ -157,7 +158,7 @@ func getResolutionHaiku() string {
 // --- Linux/X11 ---
 func getResolutionX11() string {
 	// 优先使用 xrandr
-	if pathExists("xrandr") && os.Getenv("DISPLAY") != "" && os.Getenv("WAYLAND_DISPLAY") == "" {
+	if utils.PathExists("xrandr") && os.Getenv("DISPLAY") != "" && os.Getenv("WAYLAND_DISPLAY") == "" {
 		cmd := exec.Command("xrandr", "--nograb", "--current")
 		out, err := cmd.Output()
 		if err != nil {
@@ -175,7 +176,7 @@ func getResolutionX11() string {
 	}
 
 	// fallback: xdpyinfo
-	if pathExists("xdpyinfo") && os.Getenv("DISPLAY") != "" {
+	if utils.PathExists("xdpyinfo") && os.Getenv("DISPLAY") != "" {
 		cmd := exec.Command("xdpyinfo")
 		out, err := cmd.Output()
 		if err == nil {
@@ -203,9 +204,4 @@ func getResolutionX11() string {
 	}
 
 	return ""
-}
-
-func pathExists(name string) bool {
-	_, err := exec.LookPath(name)
-	return err == nil
 }

@@ -7,9 +7,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
-func getUptime(osName, uptimeShorthand string) string {
+func GetUptime(osName, uptimeShorthand string) string {
 	var s int64
 
 	switch osName {
@@ -130,7 +132,7 @@ func getUptime(osName, uptimeShorthand string) string {
 
 	// Handle shorthand formats
 	switch uptimeShorthand {
-	case "on":
+	case utils.ON:
 		uptime = strings.ReplaceAll(uptime, " minutes", " mins")
 		uptime = strings.ReplaceAll(uptime, " minute", " min")
 		uptime = strings.ReplaceAll(uptime, " seconds", " secs")

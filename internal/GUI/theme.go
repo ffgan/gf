@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetTheme() string {
@@ -23,7 +25,7 @@ func GetTheme() string {
 
 func readKDETheme(key string) string {
 	path := filepath.Join(os.Getenv("HOME"), ".config", "kdeglobals")
-	if !fileExists(path) {
+	if !utils.FileExists(path) {
 		return ""
 	}
 	b, _ := os.ReadFile(path)
@@ -43,7 +45,7 @@ func readGtk2Theme(name string) string {
 		"/usr/share/gtk-2.0/gtkrc",
 	}
 	for _, p := range paths {
-		if !fileExists(p) {
+		if !utils.FileExists(p) {
 			continue
 		}
 		data, _ := os.ReadFile(p)
@@ -61,7 +63,7 @@ func readGtk3Theme(name, key string) string {
 	if conf == "" {
 		conf = filepath.Join(os.Getenv("HOME"), ".config", "gtk-3.0", "settings.ini")
 	}
-	if fileExists(conf) {
+	if utils.FileExists(conf) {
 		data, _ := os.ReadFile(conf)
 		for _, line := range strings.Split(string(data), "\n") {
 			if strings.HasPrefix(line, name) {
@@ -75,7 +77,7 @@ func readGtk3Theme(name, key string) string {
 
 func readLXQtTheme(key string) string {
 	path := filepath.Join(os.Getenv("HOME"), ".config", "lxqt", "lxqt.conf")
-	if !fileExists(path) {
+	if !utils.FileExists(path) {
 		return ""
 	}
 	data, _ := os.ReadFile(path)
@@ -89,7 +91,7 @@ func readLXQtTheme(key string) string {
 
 func readFlyTheme(key string) string {
 	path := filepath.Join(os.Getenv("HOME"), ".fly", "paletterc")
-	if !fileExists(path) {
+	if !utils.FileExists(path) {
 		return ""
 	}
 	data, _ := os.ReadFile(path)
@@ -103,7 +105,7 @@ func readFlyTheme(key string) string {
 
 func readQt5ctTheme(key string) string {
 	conf := filepath.Join(os.Getenv("HOME"), ".config", "qt5ct", "qt5ct.conf")
-	if !fileExists(conf) {
+	if !utils.FileExists(conf) {
 		return ""
 	}
 	data, _ := os.ReadFile(conf)
@@ -116,7 +118,7 @@ func readQt5ctTheme(key string) string {
 }
 
 func getGSettings(schema, key string) string {
-	out := runCmd("gsettings", "get", schema, key)
+	out := utils.RunCmd("gsettings", "get", schema, key)
 	return strings.Trim(strings.TrimSpace(out), "'\"")
 }
 

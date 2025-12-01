@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func cleanModelName(model string) string {
@@ -29,46 +31,46 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 
 	switch osName {
 	case Linux:
-		if pathExists("/android/system/") || pathExists("/system/app/") {
+		if utils.PathExists("/android/system/") || utils.PathExists("/system/app/") {
 			model = fmt.Sprintf("%s %s",
-				runCmd("getprop", "ro.product.brand"),
-				runCmd("getprop", "ro.product.model"))
-		} else if pathExists("/sys/devices/virtual/dmi/id/product_name") ||
-			pathExists("/sys/devices/virtual/dmi/id/product_version") {
-			model = readFileTrim("/sys/devices/virtual/dmi/id/product_name") + " " +
-				readFileTrim("/sys/devices/virtual/dmi/id/product_version")
-		} else if pathExists("/sys/devices/virtual/dmi/id/board_vendor") ||
-			pathExists("/sys/devices/virtual/dmi/id/board_name") {
-			model = readFileTrim("/sys/devices/virtual/dmi/id/board_vendor") + " " +
-				readFileTrim("/sys/devices/virtual/dmi/id/board_name")
-		} else if pathExists("/sys/firmware/devicetree/base/model") {
-			model = readFileTrim("/sys/firmware/devicetree/base/model")
-		} else if pathExists("/tmp/sysinfo/model") {
-			model = readFileTrim("/tmp/sysinfo/model")
+				utils.RunCmd("getprop", "ro.product.brand"),
+				utils.RunCmd("getprop", "ro.product.model"))
+		} else if utils.PathExists("/sys/devices/virtual/dmi/id/product_name") ||
+			utils.PathExists("/sys/devices/virtual/dmi/id/product_version") {
+			model = utils.ReadFileTrim("/sys/devices/virtual/dmi/id/product_name") + " " +
+				utils.ReadFileTrim("/sys/devices/virtual/dmi/id/product_version")
+		} else if utils.PathExists("/sys/devices/virtual/dmi/id/board_vendor") ||
+			utils.PathExists("/sys/devices/virtual/dmi/id/board_name") {
+			model = utils.ReadFileTrim("/sys/devices/virtual/dmi/id/board_vendor") + " " +
+				utils.ReadFileTrim("/sys/devices/virtual/dmi/id/board_name")
+		} else if utils.PathExists("/sys/firmware/devicetree/base/model") {
+			model = utils.ReadFileTrim("/sys/firmware/devicetree/base/model")
+		} else if utils.PathExists("/tmp/sysinfo/model") {
+			model = utils.ReadFileTrim("/tmp/sysinfo/model")
 		}
 
 	case MacOSX, MacOS, RavynOS:
-		arch := runCmd("arch")
+		arch := utils.RunCmd("arch")
 		isHackintosh := false
 		if arch != "arm64" {
-			out := runCmd("kextstat")
+			out := utils.RunCmd("kextstat")
 			if strings.Contains(out, "FakeSMC") || strings.Contains(out, "VirtualSMC") {
 				isHackintosh = true
 			}
 		}
 
 		if isHackintosh {
-			model = fmt.Sprintf("Hackintosh (SMBIOS: %s)", runCmd("sysctl", "-n", "hw.model"))
+			model = fmt.Sprintf("Hackintosh (SMBIOS: %s)", utils.RunCmd("sysctl", "-n", "hw.model"))
 		} else {
 			if strings.HasPrefix(osxVersion, "10.4") || strings.HasPrefix(osxVersion, "10.5") {
-				line := runCmd("system_profiler", "SPHardwareDataType")
+				line := utils.RunCmd("system_profiler", "SPHardwareDataType")
 				re := regexp.MustCompile(`Machine Name:\s*(.+)`)
 				m := re.FindStringSubmatch(line)
 				if len(m) > 1 {
-					model = fmt.Sprintf("%s (%s)", strings.TrimSpace(m[1]), runCmd("sysctl", "-n", "hw.model"))
+					model = fmt.Sprintf("%s (%s)", strings.TrimSpace(m[1]), utils.RunCmd("sysctl", "-n", "hw.model"))
 				}
 			} else {
-				model = runCmd("sysctl", "-n", "hw.model")
+				model = utils.RunCmd("sysctl", "-n", "hw.model")
 			}
 		}
 
@@ -85,40 +87,40 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 
 	case BSD, MINIX:
 		if kernelName == "FreeBSD" {
-			model = runCmd("kenv", "smbios.system.version")
+			model = utils.RunCmd("kenv", "smbios.system.version")
 		} else {
-			model = runCmd("sysctl", "-n", "hw.vendor", "hw.product")
+			model = utils.RunCmd("sysctl", "-n", "hw.vendor", "hw.product")
 		}
 
 	case Windows:
-		model = runCmd("wmic", "computersystem", "get", "manufacturer,model")
+		model = utils.RunCmd("wmic", "computersystem", "get", "manufacturer,model")
 		model = strings.ReplaceAll(model, "Manufacturer", "")
 		model = strings.ReplaceAll(model, "Model", "")
 
 	case Solaris, illumos:
-		model = runCmd("prtconf", "-b")
+		model = utils.RunCmd("prtconf", "-b")
 		re := regexp.MustCompile(`banner-name:\s*(.+)`)
 		m := re.FindStringSubmatch(model)
 		if len(m) > 1 {
 			model = strings.TrimSpace(m[1])
 		}
-		virt := runCmd("/usr/bin/uname", "-V")
+		virt := utils.RunCmd("/usr/bin/uname", "-V")
 		if virt != "" && virt != "non-virtualized" {
 			if model == "" {
-				model = runCmd("uname", "-i")
+				model = utils.RunCmd("uname", "-i")
 			}
 			model = fmt.Sprintf("%s (%s)", model, virt)
 		}
 
 	case AIX:
-		model = runCmd("/usr/bin/uname", "-M")
+		model = utils.RunCmd("/usr/bin/uname", "-M")
 
 	case FreeMiNT:
-		model = runCmd("sysctl", "-n", "hw.model")
+		model = utils.RunCmd("sysctl", "-n", "hw.model")
 		model = strings.ReplaceAll(model, "(_MCH *)", "")
 
 	case Interix:
-		model = runCmd("/dev/fs/C/Windows/System32/wbem/WMIC.exe", "computersystem", "get", "manufacturer,model")
+		model = utils.RunCmd("/dev/fs/C/Windows/System32/wbem/WMIC.exe", "computersystem", "get", "manufacturer,model")
 		model = strings.ReplaceAll(model, "Manufacturer", "")
 		model = strings.ReplaceAll(model, "Model", "")
 	}

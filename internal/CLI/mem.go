@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ffgan/gf/configs"
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func GetMemory(osName string, config *MemoryConfig) (*MemoryInfo, error) {
@@ -359,9 +360,9 @@ func PrintMem(osName string, mem configs.Memory, bar configs.ProgressBar) string
 
 	var ShowPercent bool
 	switch mem.MemoryPercent {
-	case "on":
+	case utils.ON:
 		ShowPercent = true
-	case "off":
+	case utils.OFF:
 		ShowPercent = false
 	}
 
