@@ -81,7 +81,11 @@ func GetCols(params ColorBlocksParams, leftMax int) ColorBlocksResult {
 
 	if blocks2Str != "" {
 		// Add reset code after the blocks: ESC[0m (reset all attributes)
-		row := fmt.Sprintf("\033[%dC", leftMax+1) + strings.ReplaceAll(blockSpaces, " ", blocks2Str+"\033[0mnl")
+		// BUG: On some terminals, the blocks may shift left by one column
+		if term == "vscode" {
+			leftMax += 1
+		}
+		row := fmt.Sprintf("\033[%dC", leftMax) + strings.ReplaceAll(blockSpaces, " ", blocks2Str+"\033[0mnl")
 
 		cols.WriteString(row)
 	}
