@@ -14,7 +14,7 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 	switch osName {
 	case Linux, BSD, MINIX, Ironclad:
 		switch {
-		case fileExists("/etc/os-release"):
+		case FileExists("/etc/os-release"):
 			// Try to parse /etc/os-release
 			content, _ := os.ReadFile("/etc/os-release")
 			lines := strings.Split(string(content), "\n")
@@ -35,10 +35,10 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 			default:
 				distro = fmt.Sprintf("%s %s", name, version)
 			}
-		case fileExists("/etc/debian_version"):
+		case FileExists("/etc/debian_version"):
 			ver := readFirstLine("/etc/debian_version")
 			distro = "Debian " + ver
-		case fileExists("/etc/redhat-release"):
+		case FileExists("/etc/redhat-release"):
 			ver := readFirstLine("/etc/redhat-release")
 			distro = "Red Hat " + ver
 		default:

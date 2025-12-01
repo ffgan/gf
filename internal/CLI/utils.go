@@ -48,7 +48,7 @@ const (
 	OpenBSD     string = "OpenBSD"
 )
 
-func fileExists(path string) bool {
+func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }

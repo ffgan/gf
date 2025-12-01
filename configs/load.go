@@ -154,6 +154,35 @@ func DefaultConfig() Config {
 		MiscOptions: MiscOptions{
 			Stdout: "auto",
 		},
+		PrintInfo: PrintInfo{
+			InfoList: [][]string{
+				{"title"},
+				{"underline"},
+				{"OS", "distro"},
+				{"Host", "model"},
+				{"Kernel", "kernel"},
+				{"Uptime", "uptime"},
+				{"Packages", "packages"},
+				{"Shell", "shell"},
+				{"Editor", "editor"},
+				{"Resolution", "resolution"},
+				{"DE", "de"},
+				{"WM", "wm"},
+				{"WM Theme", "wm_theme"},
+				{"Theme", "theme"},
+				{"Icons", "icons"},
+				{"Cursor", "cursor"},
+				{"Terminal", "term"},
+				{"Terminal Font", "term_font"},
+				{"CPU", "cpu"},
+				{"GPU", "gpu"},
+				{"Memory", "memory"},
+				{"Network", "network"},
+				{"Bluetooth", "bluetooth"},
+				{"BIOS", "bios"},
+				{"cols"},
+			},
+		},
 	}
 }
 
@@ -169,7 +198,6 @@ func ParseConfig(data string, config *Config) error {
 		real_lines = append(real_lines, line)
 	}
 
-	//
 	print_info_lines_start := -1
 	for i, line := range real_lines {
 		if line == "print_info() {" {
@@ -192,29 +220,30 @@ func ParseConfig(data string, config *Config) error {
 	if print_info_lines_end == -1 {
 		return fmt.Errorf("invalid config format,cannot find print_info block's end")
 	}
-
-	for i := print_info_lines_start + 1; i < print_info_lines_end; i++ {
-		var info_line_list []string
-		if strings.Contains(real_lines[i], "\"") {
+	if config.InfoList == nil {
+		for i := print_info_lines_start + 1; i < print_info_lines_end; i++ {
+			var info_line_list []string
+			if strings.Contains(real_lines[i], "\"") {
+				var tmp []string
+				info_line_list = strings.Split(real_lines[i], "\"")
+				for _, item := range info_line_list {
+					item = strings.TrimSpace(item)
+					tmp = append(tmp, item)
+				}
+				info_line_list = tmp
+			} else {
+				info_line_list = strings.Split(real_lines[i], " ")
+			}
 			var tmp []string
-			info_line_list = strings.Split(real_lines[i], "\"")
 			for _, item := range info_line_list {
-				item = strings.TrimSpace(item)
-				tmp = append(tmp, item)
+				if item == "" || item == "info" {
+					continue
+				}
+				tmp = append(tmp, strings.ReplaceAll(item, "\"", ""))
 			}
-			info_line_list = tmp
-		} else {
-			info_line_list = strings.Split(real_lines[i], " ")
-		}
-		var tmp []string
-		for _, item := range info_line_list {
-			if item == "" || item == "info" {
-				continue
-			}
-			tmp = append(tmp, strings.ReplaceAll(item, "\"", ""))
-		}
 
-		config.InfoList = append(config.InfoList, tmp)
+			config.InfoList = append(config.InfoList, tmp)
+		}
 	}
 
 	config_list := real_lines[print_info_lines_end+1:]

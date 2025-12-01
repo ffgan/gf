@@ -8,6 +8,8 @@ import (
 	"github.com/ffgan/gf/internal/info"
 )
 
+const neofetch_conf = "/etc/neofetch/default.conf"
+
 func Run(ASCIIFiles embed.FS) {
 	kernel_name, kernel_version, kernel_machine, darwin_name := cache_uname()
 
@@ -15,18 +17,16 @@ func Run(ASCIIFiles embed.FS) {
 
 	cache_dir := get_cache_dir()
 
-	// load Neofetch default config.
-	config, err := configs.LoadConfig("configs/config")
+	var file_path string
+	if cli.FileExists(neofetch_conf) == true {
+		// load Neofetch default config.
+		file_path = neofetch_conf
+	}
+
+	config, err := configs.LoadConfig(file_path)
 	if err != nil {
 		panic(err)
 	}
-
-	// TODO: load neofetch config
-	// 结合上面内容，先加载一遍默认的，再尝试加载下面的配置文件
-	// # If /etc/neofetch/default.conf exist, set config variable to its content
-	// if [[ -f /etc/neofetch/default.conf ]]; then
-	//     config="$(< /etc/neofetch/default.conf)"
-	// fi
 
 	parseArgs(config)
 
