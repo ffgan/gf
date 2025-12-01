@@ -114,15 +114,3 @@ func getStyle(ctx StyleContext) string {
 	})
 	return theme
 }
-
-func GetIcons() string {
-	return getIcons()
-}
-
-func GetFont() string {
-	return "Font: " + getFont()
-}
-
-func GetCursor() string {
-	return getCursor()
-}

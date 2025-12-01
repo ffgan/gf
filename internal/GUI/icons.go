@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func getIcons() string {
+func GetIcons() string {
 	ctx := StyleContext{
 		Name:      "gtk-icon-theme-name",
 		GSettings: "icon-theme",

@@ -1,6 +1,6 @@
 package gui
 
-func getCursor() string {
+func GetCursor() string {
 	ctx := StyleContext{
 		Name:      "gtk-cursor-theme-name",
 		GSettings: "cursor-theme",

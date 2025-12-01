@@ -1,6 +1,6 @@
 package gui
 
-func getFont() string {
+func GetFont() string {
 	ctx := StyleContext{
 		Name:      "gtk-font-name",
 		GSettings: "font-name",

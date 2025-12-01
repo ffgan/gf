@@ -175,19 +175,19 @@ func (h *hardware) Get_style() {
 }
 
 func (h *hardware) Get_theme() {
-	h.theme = "not implemented"
+	h.theme = gui.GetTheme()
 }
 
 func (h *hardware) Get_icons() {
-	h.icons = "not implemented"
+	h.icons = gui.GetIcons()
 }
 
 func (h *hardware) Get_font() {
-
+	h.term_font = gui.GetFont()
 }
 
 func (h *hardware) Get_cursor() {
-	h.cursor = "not implemented"
+	h.cursor = gui.GetCursor()
 }
 
 func (h *hardware) Get_java_ver() {
@@ -207,7 +207,7 @@ func (h *hardware) Get_term() {
 }
 
 func (h *hardware) Get_term_font() {
-	h.term_font = cli.GetTermFont(h.os)
+	h.term_font = gui.GetFont()
 }
 
 func (h *hardware) Get_disk() {
@@ -243,7 +243,7 @@ func (h *hardware) Get_gpu_driver() {
 }
 
 func (h *hardware) Get_cols() {
-	h.cols = "not implemented"
+	h.cols = cli.Getcols(h.leftMax)
 }
 
 func (h *hardware) Get_image_source() {
