@@ -416,7 +416,8 @@ func (c *Context) info(arg1, arg2 string) {
 	fmt.Printf("\033[%dC", c.target.leftMax)
 	// Print based on conditions
 	if arg2 != "" && strings.TrimSpace(output) != "" {
-		c.prin(arg1, output)
+		// c.prin(arg1, output)
+		fmt.Println(Info(arg1, output))
 	} else if strings.TrimSpace(output) != "" {
 		c.prin(output, "")
 	} else {
@@ -427,6 +428,16 @@ func (c *Context) info(arg1, arg2 string) {
 	subtitle = ""
 }
 
+func Info(name, data string) string {
+	if data == "" {
+		return ""
+	}
+	if name != "" {
+		name = "\033[1;34m" + name + ": \033[0m"
+	}
+	return name + data
+}
+
 // prin prints formatted output
 func (c *Context) prin(arg1, arg2 string) {
 	var str string
@@ -435,7 +446,7 @@ func (c *Context) prin(arg1, arg2 string) {
 	// If $2 doesn't exist we format $1 as info
 	if trim(arg1) != "" && arg2 != "" {
 		if json {
-			fmt.Printf("    %s\n", fmt.Sprintf(`"%s": "%s",`, arg1, arg2))
+			fmt.Printf("    %s\n", Info(arg1, arg2))
 			return
 		}
 		if arg2 != "" {

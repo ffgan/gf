@@ -67,11 +67,3 @@ func Run(ASCIIFiles embed.FS) {
 
 	dynamic_prompt()
 }
-
-func Info(name, data string) string {
-	if data == "" {
-		return ""
-	}
-	name = "\033[1;34m" + name + ": \033[0m"
-	return name + data
-}
