@@ -122,6 +122,8 @@ func (h *hardware) field(name string) string {
 		return h.cpu
 	case "gpu":
 		return h.gpu
+	case "npu":
+		return h.npu
 	case "memory":
 		return h.memory
 	case "network":

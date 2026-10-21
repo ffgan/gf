@@ -21,14 +21,20 @@ func GetMemory(osName string, config *MemoryConfig) (*MemoryInfo, error) {
 		memUsed, memTotal, err = getMemoryLinux()
 	case Darwin:
 		memUsed, memTotal, err = getMemoryDarwin()
-	case FreeBSD, OpenBSD, NetBSD, DragonFly:
+	case FreeBSD, OpenBSD, NetBSD, DragonFly, BSD, Bitrig:
 		memUsed, memTotal, err = getMemoryBSD(osName)
-	case Solaris:
+	case Solaris, illumos:
 		memUsed, memTotal, err = getMemorySolaris()
 	case Windows:
 		memUsed, memTotal, err = getMemoryWindows()
 	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", osName)
+		if isBSDFamily(osName) {
+			memUsed, memTotal, err = getMemoryBSD(osName)
+		} else if _, statErr := os.Stat("/proc/meminfo"); statErr == nil {
+			memUsed, memTotal, err = getMemoryLinux()
+		} else {
+			return nil, fmt.Errorf("unsupported operating system: %s", osName)
+		}
 	}
 
 	if err != nil {
@@ -174,26 +180,22 @@ func getMemoryBSD(osName string) (int64, int64, error) {
 	var memFree int64
 
 	switch osName {
-	case FreeBSD, DragonFly:
-		pageSize, err := sysctlInt64("hw.pagesize")
-		if err != nil {
-			return 0, 0, err
-		}
-
-		inactive, _ := sysctlInt64("vm.stats.vm.v_inactive_count")
-		unused, _ := sysctlInt64("vm.stats.vm.v_free_count")
-		cache, _ := sysctlInt64("vm.stats.vm.v_cache_count")
-
-		memFree = (inactive + unused + cache) * pageSize / 1024
-
 	case OpenBSD:
 		// OpenBSD uses vmstat for memory info
 		memFree = getVmstatValue(3) // Used is in column 3
 		return memFree * 1024, memTotal, nil
-
-	default:
-		// Generic BSD
+	case NetBSD:
 		memFree = getVmstatValue(5)
+	default:
+		// FreeBSD, DragonFly, and FreeBSD derivatives share these counters.
+		pageSize, err := sysctlInt64("hw.pagesize")
+		if err != nil {
+			return 0, 0, err
+		}
+		inactive, _ := sysctlInt64("vm.stats.vm.v_inactive_count")
+		unused, _ := sysctlInt64("vm.stats.vm.v_free_count")
+		cache, _ := sysctlInt64("vm.stats.vm.v_cache_count")
+		memFree = (inactive + unused + cache) * pageSize / 1024
 	}
 
 	memUsed := memTotal - memFree

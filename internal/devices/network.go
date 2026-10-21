@@ -18,10 +18,28 @@ func GetNetwork(osName string) string {
 	if strings.Contains(osName, cli.Linux) {
 		return getNetworkLinux()
 	}
-	if strings.Contains(osName, cli.MacOSX) || strings.Contains(osName, cli.MacOS) {
+	if osName == cli.Darwin || strings.Contains(osName, cli.MacOSX) || strings.Contains(osName, cli.MacOS) {
 		return getNetworkMac()
 	}
+	if cli.BSDFamily(osName) {
+		return getNetworkBSD()
+	}
 	return ""
+}
+
+func getNetworkBSD() string {
+	out := utils.RunCommand("ifconfig", "-l")
+	if out == "" {
+		return ""
+	}
+	var parts []string
+	for _, name := range strings.Fields(out) {
+		if name == "lo0" || name == "lo" || strings.HasPrefix(name, "pflog") || strings.HasPrefix(name, "pfsync") {
+			continue
+		}
+		parts = append(parts, name)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func getNetworkLinux() string {

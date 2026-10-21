@@ -13,6 +13,31 @@ func TestResolveUbuntu(t *testing.T) {
 	}
 }
 
+func TestResolveMoreDistros(t *testing.T) {
+	cases := map[string]string{
+		"OpenWrt":         "Wrt",
+		"uos":             "Uos",
+		"Kylin":           "Ubuntu-Kylin",
+		"openKylin":       "openKylin",
+		"HarmonyOS":       "Android",
+		"HyperOS":         "Android",
+		"Raspberry Pi OS": "Raspbian",
+		"Loongnix":        "Debian",
+		"Anolis OS":       "CentOS",
+		"Rocky Linux":     "rocky",
+		"archlinux":       "Arch",
+		"opensuse-leap":   "openSUSE_Leap",
+		"ghostbsd":        "GhostBSD",
+		"omnios":          "OmniOS",
+		"azurelinux":      "CBL-Mariner",
+	}
+	for name, file := range cases {
+		if got := Resolve(name).FileName; got != file {
+			t.Errorf("%s: got %q want %q", name, got, file)
+		}
+	}
+}
+
 func TestResolveFallback(t *testing.T) {
 	got := Resolve("not-a-real-distro")
 	if got.FileName != "Linux" {

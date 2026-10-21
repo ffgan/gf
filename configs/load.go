@@ -177,6 +177,7 @@ func DefaultConfig() Config {
 				{"Terminal Font", "term_font"},
 				{"CPU", "cpu"},
 				{"GPU", "gpu"},
+				{"NPU", "npu"},
 				{"GPU Driver", "gpu_driver"},
 				{"Memory", "memory"},
 				{"Disk", "disk"},

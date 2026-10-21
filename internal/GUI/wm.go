@@ -71,7 +71,7 @@ func GetWM(osName, kernelName string) string {
 	// --- macOS detection ---
 	if wm == "" {
 		switch osName {
-		case cli.MacOSX, cli.MacOS:
+		case cli.MacOSX, cli.MacOS, cli.Darwin:
 			psLine := utils.RunCommand("ps", "-e")
 			switch {
 			case strings.Contains(psLine, "chunkwm"):

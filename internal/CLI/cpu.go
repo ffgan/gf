@@ -72,12 +72,13 @@ func GetCPU(OS, Machine, ShowCores, ShowSpeed, ShowTemp, ShowBrand, speedType, S
 }
 
 type CPUInfo struct {
-	Name        string
-	Cores       int
-	Speed       int // MHz
-	Temperature float64
-	OS          string
-	Machine     string
+	Name         string
+	Cores        int
+	Speed        int // MHz
+	Temperature  float64
+	OS           string
+	Machine      string
+	CountsInName bool
 }
 
 type CPUConfig struct {
@@ -110,11 +111,17 @@ func GetCPUInfo(OS, Machine string, config CPUConfig) (*CPUInfo, error) {
 		return getCPULinux(info, config)
 	case Darwin:
 		return getCPUDarwin(info, config)
-	case FreeBSD, OpenBSD, NetBSD, DragonFly:
+	case FreeBSD, OpenBSD, NetBSD, DragonFly, BSD, Bitrig:
 		return getCPUBSD(info, config)
-	case Solaris:
+	case Solaris, illumos:
 		return getCPUSolaris(info, config)
 	default:
+		if isBSDFamily(OS) {
+			return getCPUBSD(info, config)
+		}
+		if utils.FileExists("/proc/cpuinfo") {
+			return getCPULinux(info, config)
+		}
 		return nil, fmt.Errorf("unsupported OS: %s", OS)
 	}
 }
@@ -127,31 +134,8 @@ func getCPULinux(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	}
 
 	lines := strings.Split(string(data), "\n")
-
-	// Parse CPU name
-	for _, line := range lines {
-		if strings.Contains(line, "model name") {
-			parts := strings.Split(line, ":")
-			if len(parts) >= 2 {
-				info.Name = strings.TrimSpace(parts[1])
-				break
-			}
-		}
-	}
-
-	// Fallback for ARM and other architectures
-	if info.Name == "" {
-		for _, line := range lines {
-			lower := strings.ToLower(line)
-			if strings.Contains(lower, "hardware") || strings.Contains(lower, "processor") {
-				parts := strings.Split(line, ":")
-				if len(parts) >= 2 {
-					info.Name = strings.TrimSpace(parts[1])
-					break
-				}
-			}
-		}
-	}
+	dt, _ := os.ReadFile("/sys/firmware/devicetree/base/model")
+	info.Name, info.CountsInName = IdentifyCPU(string(data), string(dt))
 
 	// Get CPU cores
 	if config.CoreType == "logical" {
@@ -241,7 +225,15 @@ func getCPULinux(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 
 func getCPUDarwin(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	// Get CPU brand string
-	info.Name = utils.RunCommand("sysctl", "-n", "machdep.cpu.brand_string")
+	info.Name = applyFamilyCode(utils.RunCommand("sysctl", "-n", "machdep.cpu.brand_string"))
+	if info.Name == "" || genericCPUName(info.Name) {
+		family := strings.TrimSpace(utils.RunCommand("sysctl", "-n", "hw.cpufamily"))
+		if named := applyFamilyCode(family); named != "" && named != family {
+			info.Name = named
+		} else {
+			info.Name = ""
+		}
+	}
 
 	// Fallback to system_profiler
 	if info.Name == "" {
@@ -382,8 +374,8 @@ func FormatCPUInfo(info *CPUInfo, config CPUConfig) string {
 		cpu = strings.TrimPrefix(cpu, "Qualcomm ")
 	}
 
-	// Add cores
-	if config.ShowCores && info.Cores > 0 {
+	// Add cores. A big.LITTLE name already lists each cluster.
+	if config.ShowCores && info.Cores > 0 && !info.CountsInName {
 		cpu = fmt.Sprintf("%s (%d)", cpu, info.Cores)
 	}
 

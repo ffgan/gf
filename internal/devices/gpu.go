@@ -18,7 +18,7 @@ func GetGPU(osName, showBrand, gpuType string) string {
 	case cli.Linux:
 		gpu = getLinuxGPU()
 
-	case cli.MacOSX, cli.MacOS:
+	case cli.MacOSX, cli.MacOS, cli.Darwin:
 		gpu = getMacGPU()
 
 	case cli.Iphone:
@@ -26,7 +26,7 @@ func GetGPU(osName, showBrand, gpuType string) string {
 	case cli.Windows:
 		gpu = getWindowsGPU()
 
-	case cli.FreeBSD, cli.DragonFly:
+	case cli.FreeBSD, cli.DragonFly, "MidnightBSD", "HardenedBSD", "GhostBSD", "NomadBSD":
 		out := utils.RunCommand("pciconf", "-lv")
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "device") {
@@ -84,6 +84,15 @@ func filterGPUType(gpu, kind string) string {
 }
 
 func getLinuxGPU() string {
+	// SoCs such as the Raspberry Pi expose a GPU through DRM and not PCI.
+	// Name those from sysfs before starting lspci or a GL context.
+	if name, noPCIDisplay := gpuFromSysfs(); name != "" {
+		return name
+	} else if drm := gpuFromDRM(); drm != "" {
+		return drm
+	} else if noPCIDisplay {
+		return ""
+	}
 	out := utils.RunCommand("lspci", "-mm")
 	if out == "" {
 		return parseGLXInfo()
