@@ -1,5 +1,5 @@
 module github.com/ffgan/gf
 
-go 1.24
+go 1.22
 
 require github.com/armon/go-radix v1.0.0

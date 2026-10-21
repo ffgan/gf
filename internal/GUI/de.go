@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
@@ -40,7 +41,7 @@ func detectDesktopEnvironment() string {
 	return "Unknown"
 }
 
-func GetDE(osName, distro, kernel_name string) string {
+func GetDE(osName, distro, kernel_name, showVersion string) string {
 	if deRun {
 		return de
 	}
@@ -85,6 +86,22 @@ func GetDE(osName, distro, kernel_name string) string {
 	default:
 		if !wmRun {
 			GetWM(osName, kernel_name)
+		}
+
+		procs := utils.RunCommand("ps", "-e", "-o", "comm=")
+		switch {
+		case strings.Contains(procs, "xfce4-session"):
+			de = "Xfce"
+		case strings.Contains(procs, "gnome-shell"):
+			de = "GNOME"
+		case strings.Contains(procs, "plasmashell"):
+			de = "KDE"
+		case strings.Contains(procs, "cinnamon"):
+			de = "Cinnamon"
+		case strings.Contains(procs, "mate-session"):
+			de = "MATE"
+		case strings.Contains(procs, "lxqt-session"):
+			de = "LXQt"
 		}
 
 		desktopSession := os.Getenv("DESKTOP_SESSION")
@@ -164,8 +181,9 @@ func GetDE(osName, distro, kernel_name string) string {
 	}
 
 	// Add version info if available
-	if deVersion == utils.ON && de != "" {
+	if showVersion == utils.ON && de != "" {
 		deVer, kfVer, qtVer := getDEVersion(de)
+		deVer = shortVersion(deVer)
 		if deVer != "" {
 			if strings.HasPrefix(de, "Plasma") {
 				de = fmt.Sprintf("%s %s [KF %s] [Qt %s]", de, deVer, kfVer, qtVer)
@@ -175,12 +193,29 @@ func GetDE(osName, distro, kernel_name string) string {
 		}
 	}
 
-	// Add session type (X11 / Wayland)
-	if st := os.Getenv("XDG_SESSION_TYPE"); st != "" {
-		de += fmt.Sprintf(" (%s)", st)
+	if de != "" && !strings.Contains(de, "(") {
+		switch {
+		case os.Getenv("WAYLAND_DISPLAY") != "":
+			de += " (Wayland)"
+		case os.Getenv("DISPLAY") != "" && os.Getenv("DISPLAY") != "wayland":
+			if os.Getenv("XDG_SESSION_TYPE") != "tty" {
+				de += " (X11)"
+			}
+		}
 	}
 
 	return de
+}
+
+func shortVersion(s string) string {
+	s = strings.TrimSpace(strings.Split(s, "\n")[0])
+	if s == "" {
+		return ""
+	}
+	if m := regexp.MustCompile(`\d+\.\d+(?:\.\d+)?`).FindString(s); m != "" {
+		return m
+	}
+	return s
 }
 
 func getDEVersion(name string) (string, string, string) {

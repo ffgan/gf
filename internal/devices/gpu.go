@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
@@ -12,7 +11,7 @@ import (
 	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetGPU(osName string) string {
+func GetGPU(osName, showBrand, gpuType string) string {
 	var gpu string
 
 	switch osName {
@@ -48,14 +47,40 @@ func GetGPU(osName string) string {
 		}
 	}
 
-	// Optional: remove brand names if disabled
-	if os.Getenv("GPU_BRAND") == utils.OFF {
+	if showBrand == utils.OFF {
 		gpu = strings.ReplaceAll(gpu, "AMD", "")
 		gpu = strings.ReplaceAll(gpu, "NVIDIA", "")
 		gpu = strings.ReplaceAll(gpu, "Intel", "")
+		gpu = strings.TrimSpace(gpu)
 	}
+	return filterGPUType(gpu, gpuType)
+}
 
-	return gpu
+func filterGPUType(gpu, kind string) string {
+	if gpu == "" || kind == "" || kind == "all" {
+		return gpu
+	}
+	var keep []string
+	for _, part := range strings.Split(gpu, ", ") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		integrated := strings.Contains(part, "Intel") || strings.Contains(strings.ToLower(part), "integrated")
+		switch kind {
+		case "integrated":
+			if integrated {
+				keep = append(keep, part)
+			}
+		case "dedicated":
+			if !integrated {
+				keep = append(keep, part)
+			}
+		default:
+			keep = append(keep, part)
+		}
+	}
+	return strings.Join(keep, ", ")
 }
 
 func getLinuxGPU() string {

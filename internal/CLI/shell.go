@@ -31,48 +31,10 @@ func GetShell(shellPath, shellVersion string) string {
 	shellName := filepath.Base(shellEnv)
 
 	switch shellName {
-	case "bash":
-		version := os.Getenv("BASH_VERSION")
-		if version == "" {
-			version = utils.RunCommand("-c", "printf %s \"$BASH_VERSION\"")
-		}
-		shell += strings.Split(version, "-")[0]
-
 	case "sh", "ash", "dash", "es":
-		// no version info
-	case "ksh", "mksh", "pdksh", "lksh":
-		version := utils.RunCommand("-c", "printf %s \"$KSH_VERSION\"")
-		version = strings.ReplaceAll(version, " * KSH", "")
-		version = strings.ReplaceAll(version, "version", "")
-		shell += strings.TrimSpace(version)
-
-	case "osh":
-		version := os.Getenv("OIL_VERSION")
-		if version == "" {
-			version = utils.RunCommand("-c", "printf %s \"$OIL_VERSION\"")
-		}
-		shell += version
-
-	case "tcsh":
-		version := utils.RunCommand("-c", "printf %s $tcsh")
-		shell += version
-
-	case "yash":
-		version := utils.RunCommand("--version")
-		version = strings.ReplaceAll(version, " "+shellName, "")
-		version = strings.ReplaceAll(version, " Yet another shell", "")
-		version = regexp.MustCompile(`Copyright.*`).ReplaceAllString(version, "")
-		shell += strings.TrimSpace(version)
-
-	case "nu":
-		version := utils.RunCommand("-c", "version | get version")
-		version = strings.ReplaceAll(version, " "+shellName, "")
-		shell += version
-
+		// these shells don't report a useful version
 	default:
-		version := utils.RunCommand("--version")
-		version = strings.ReplaceAll(version, " "+shellName, "")
-		shell += version
+		shell += versionOfShell(shellEnv, shellName)
 	}
 
 	// Clean unwanted info similar to Bash
@@ -91,4 +53,29 @@ func GetShell(shellPath, shellVersion string) string {
 	}
 
 	return strings.TrimSpace(shell)
+}
+
+func versionOfShell(shellPath, shellName string) string {
+	if shellPath == "" {
+		return ""
+	}
+	out := utils.RunCommand(shellPath, "--version")
+	if out == "" {
+		out = utils.ExecOutput(shellPath, "--version")
+	}
+	line := out
+	if i := strings.IndexAny(line, "\r\n"); i >= 0 {
+		line = line[:i]
+	}
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return ""
+	}
+
+	re := regexp.MustCompile(`([0-9]+\.[0-9]+(?:\.[0-9]+)?)`)
+	if m := re.FindString(line); m != "" {
+		return m
+	}
+	line = strings.ReplaceAll(line, shellName, "")
+	return strings.TrimSpace(line)
 }

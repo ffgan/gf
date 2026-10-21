@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -80,11 +79,25 @@ func GetProcessName(pid string) string {
 }
 
 func ScanProcesses(psFlags []string, names []string) string {
-	args := append([]string{}, psFlags...)
-	out := RunCommand("ps", args...)
+	out := RunCommand("ps", "-e", "-o", "comm=")
+	if strings.TrimSpace(out) == "" && len(psFlags) > 0 {
+		out = RunCommand("ps", psFlags...)
+	}
+	found := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			found[line] = true
+			if fields := strings.Fields(line); len(fields) > 0 {
+				found[fields[len(fields)-1]] = true
+			}
+		}
+	}
 	for _, n := range names {
-		re := regexp.MustCompile(fmt.Sprintf(`(?m)^%s$`, regexp.QuoteMeta(n)))
-		if re.FindString(out) != "" {
+		if found[n] {
+			return n
+		}
+		if len(n) > 15 && found[n[:15]] {
 			return n
 		}
 	}

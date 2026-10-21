@@ -59,8 +59,10 @@ func readGtk2Theme(name string) string {
 }
 
 func readGtk3Theme(name, key string) string {
-	conf := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "gtk-3.0", "settings.ini")
-	if conf == "" {
+	var conf string
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		conf = filepath.Join(dir, "gtk-3.0", "settings.ini")
+	} else {
 		conf = filepath.Join(os.Getenv("HOME"), ".config", "gtk-3.0", "settings.ini")
 	}
 	if utils.FileExists(conf) {
@@ -123,14 +125,16 @@ func getGSettings(schema, key string) string {
 }
 
 func buildThemeString(parts map[string]string) string {
-	var res string
-	for k, v := range parts {
-		if v != "" {
-			if res != "" {
-				res += ", "
-			}
-			res += fmt.Sprintf("%s [%s]", v, k)
+	order := []string{"GTK2", "GTK3", "Qt", "KDE"}
+	seen := map[string]bool{}
+	var chunks []string
+	for _, key := range order {
+		value := strings.Trim(strings.TrimSpace(parts[key]), `"'`)
+		if value == "" || seen[value] {
+			continue
 		}
+		seen[value] = true
+		chunks = append(chunks, fmt.Sprintf("%s [%s]", value, key))
 	}
-	return res
+	return strings.Join(chunks, ", ")
 }
