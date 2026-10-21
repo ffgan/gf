@@ -7,8 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"bufio"
+	"time"
+
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
+	"github.com/ffgan/gf/internal/hyfetch"
 	"github.com/ffgan/gf/internal/logo"
 	"github.com/ffgan/gf/internal/utils"
 )
@@ -16,8 +20,49 @@ import (
 const neofetchConf = "/etc/neofetch/config.conf"
 
 func Run(ASCIIFiles embed.FS) {
+	hyOpts, rest, err := hyfetch.SplitArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+		os.Exit(2)
+	}
+	if hyOpts.Version {
+		fmt.Printf("gf %s\n", Version)
+		os.Exit(0)
+	}
+	os.Args = append([]string{os.Args[0]}, rest...)
+
 	kernelName, kernelVersion, kernelMachine, darwinName := cacheUname()
 	osName := cli.GetOS(kernelName, darwinName)
+
+	hyPath := hyOpts.ConfigFile
+	if hyPath == "" {
+		hyPath = hyfetch.ConfigPath()
+	}
+	var hyCfg hyfetch.Config
+	hyExists := false
+	if hyOpts.Configure {
+		hyCfg, err = hyfetch.Configure(hyPath, os.Stdin, os.Stdout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			os.Exit(2)
+		}
+		hyExists = true
+	} else {
+		hyCfg, hyExists, err = hyfetch.Load(hyPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	hyCfg, err = hyOpts.Apply(hyCfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+		os.Exit(2)
+	}
+	colorOn := hyExists || hyOpts.WantsColor()
+	if colorOn && (hyCfg.Backend == "" || hyCfg.Backend == "neofetch") && len(hyCfg.Args) > 0 {
+		os.Args = append(os.Args, hyCfg.Args...)
+	}
 
 	explicit, skipFile := configFromArgs(os.Args[1:])
 	var filePath string
@@ -53,10 +98,42 @@ func Run(ASCIIFiles embed.FS) {
 	}
 
 	logo.SetAppearance(h.ASCIIBold != utils.OFF, h.ASCIIColors, h.Colors)
+	if colorOn && hyCfg.Distro != "" {
+		h.ASCIIDistro = hyCfg.Distro
+	}
 	h.Get_distro()
 
+	if hyOpts.PrintFontLogo {
+		glyph, err := hyfetch.FontLogo(h.distro)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(glyph)
+		return
+	}
+	if hyOpts.TestPrint {
+		fmt.Println(logo.RawASCII(h.ascii_distro, h.ImageSource, ASCIIFiles))
+		return
+	}
+
+	theme := hyfetch.ResolveTheme(hyCfg, hyOpts)
+	now := time.Now()
+	if hyfetch.ShouldPride(hyCfg, hyOpts.June, now) {
+		mode := hyCfg.Mode
+		if mode == "" {
+			mode = hyfetch.Mode8bit
+		}
+		hyfetch.Pride(mode)
+		if !hyOpts.June {
+			hyfetch.MarkPrideShown(now)
+		}
+	}
+
 	var art []string
-	if !h.plainMode() && !strings.EqualFold(h.ImageBackend, "off") {
+	if colorOn && !h.plainMode() && !strings.EqualFold(h.ImageBackend, "off") {
+		art = hyfetchArt(h, hyCfg, hyOpts, theme, ASCIIFiles)
+	} else if !h.plainMode() && !strings.EqualFold(h.ImageBackend, "off") {
 		if lines := imageArt(h.ImageSource); len(lines) > 0 {
 			art = lines
 			logo.ApplyDistro(h.ascii_distro)
@@ -68,6 +145,42 @@ func Run(ASCIIFiles embed.FS) {
 	}
 
 	show(art, h.Rows(), h.gap())
+	if hyOpts.AskExit {
+		fmt.Fprint(os.Stderr, "Press enter to exit...")
+		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+	}
+}
+
+func hyfetchArt(h *hardware, cfg hyfetch.Config, opt hyfetch.Options, theme hyfetch.Theme, files embed.FS) []string {
+	source := h.ImageSource
+	if cfg.CustomASCIIPath != "" {
+		source = cfg.CustomASCIIPath
+	}
+	raw := logo.RawASCII(h.ascii_distro, source, files)
+	lines, profile, name, err := hyfetch.Paint(raw, cfg, opt, theme)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+		return logo.PrintASCII(h.ascii_distro, h.ImageSource, files)
+	}
+	if opt.Debug {
+		fmt.Fprintf(os.Stderr, "gf: preset %s, mode %s, align %s, colors %d\n", name, cfg.Mode, cfg.ColorAlign.Mode, len(profile.Colors))
+	}
+	art := strings.Join(lines, "\n")
+	switch cfg.Backend {
+	case "fastfetch":
+		if err := hyfetch.RunFastfetch(art, []string(cfg.Args)); err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			break
+		}
+		os.Exit(0)
+	case "macchina":
+		if err := hyfetch.RunMacchina(art, []string(cfg.Args)); err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			break
+		}
+		os.Exit(0)
+	}
+	return lines
 }
 
 func findConfig() string {

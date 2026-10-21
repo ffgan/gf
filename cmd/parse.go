@@ -7,10 +7,11 @@ import (
 	"strings"
 
 	"github.com/ffgan/gf/configs"
+	"github.com/ffgan/gf/internal/hyfetch"
 	"github.com/ffgan/gf/internal/utils"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 var (
 	showVersion bool
@@ -34,6 +35,7 @@ Usage:
 Options:
 `, Version)
 		fs.PrintDefaults()
+		fmt.Fprint(fs.Output(), hyfetch.HelpText)
 	}
 	flag.CommandLine = fs
 	fs.StringVar(&config.TitleFqdn, "title_fqdn", config.TitleFqdn, "Show the fully qualified domain name (on, off)")

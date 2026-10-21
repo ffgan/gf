@@ -1,5 +1,7 @@
 一个用于快速展示当前系统信息的命令行工具，对标 neofetch / hyfetch。纯 Go 实现，单个二进制文件，默认在左侧绘制发行版 ASCII logo，右侧列出主机信息。
 
+hyfetch 的旗帜配色、预设、`hyfetch.json` 和命令行参数可以直接用。没有 hyfetch 配置、也没传相关参数时，输出仍是原来的 neofetch 风格。
+
 ## 构建
 
 ```bash
@@ -14,7 +16,17 @@ gf --stdout
 gf --logo Arch
 gf --disable disk network
 gf --print_config > ~/.config/gf/config.conf
+
+gf -p transgender          # 用跨性别旗给 logo 上色
+gf -p '#ff0000,#00ff00,#0000ff' -m rgb
+gf --distro Arch           # 指定发行版 logo，并按 hyfetch 配置上色
+gf -c                      # 写入 ~/.config/hyfetch.json
+gf -b fastfetch            # 把上好色的 logo 交给 fastfetch
+gf --print-font-logo
+gf --june
 ```
+
+已安装 hyfetch 时，`~/.config/hyfetch.json`（或 `-C` 指定的文件）会被直接读取：预设、`8bit`/`rgb`、水平/垂直/随机上色、明度、`--args` 里的 neofetch 参数都会生效。预设表与 hyfetch 附带的 `presets.json` 相同。`-b` 的取值如果是 `ascii` 这类图片后端，仍然交给原来的 logo 逻辑；只有 `neofetch`、`fastfetch`、`macchina` 会切到 hyfetch 的后端。
 
 不带参数时，`gf` 会依次查找这些配置：
 

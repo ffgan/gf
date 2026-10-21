@@ -225,7 +225,23 @@ func stripEscapeCodes(s string) string {
 	return re.ReplaceAllString(s, "")
 }
 
+// RawASCII returns distro art with ${cN} placeholders still in place.
+func RawASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) string {
+	loadASCII(ASCIIDistro, imageSource, ASCIIFiles)
+	return asciiData
+}
+
 func PrintASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) []string {
+	raw := loadASCII(ASCIIDistro, imageSource, ASCIIFiles)
+	lines := colorize(raw)
+	if len(lines) <= 1 {
+		loadDistroASCII("Linux", ASCIIFiles)
+		lines = colorize(asciiData)
+	}
+	return lines
+}
+
+func loadASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) string {
 	raw := ""
 	if imageSource != "" && imageSource != "ascii" && imageSource != utils.AUTO {
 		fi, err := os.Stat(imageSource)
@@ -257,13 +273,7 @@ func PrintASCII(ASCIIDistro, imageSource string, ASCIIFiles embed.FS) []string {
 	_ = sysLocale
 	_ = asciiLen
 	_ = asciiLines
-
-	lines := colorize(asciiData)
-	if len(lines) <= 1 {
-		loadDistroASCII("Linux", ASCIIFiles)
-		lines = colorize(asciiData)
-	}
-	return lines
+	return asciiData
 }
 
 func colorize(data string) []string {
