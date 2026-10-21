@@ -10,31 +10,35 @@ import (
 
 func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro string) (string, string) {
 	var distro string
+	var asciiName string
 
 	switch osName {
 	case Linux, BSD, MINIX, Ironclad:
 		switch {
 		case utils.FileExists("/etc/os-release"):
-			// Try to parse /etc/os-release
-			content, _ := os.ReadFile("/etc/os-release")
-			lines := strings.Split(string(content), "\n")
-			info := map[string]string{}
-			for _, line := range lines {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					info[parts[0]] = strings.Trim(parts[1], `"`)
-				}
-			}
+			info := parseOSRelease("/etc/os-release")
 			name := info["NAME"]
-			version := info["VERSION_ID"]
+			if name == "" {
+				name = info["ID"]
+			}
+			version := info["VERSION"]
+			if version == "" {
+				version = info["VERSION_ID"]
+			}
+			pretty := info["PRETTY_NAME"]
 			switch distroShorthand {
-			case utils.ON:
-				distro = fmt.Sprintf("%s %s", name, version)
 			case "tiny":
 				distro = name
+			case utils.ON:
+				distro = strings.TrimSpace(name + " " + version)
 			default:
-				distro = fmt.Sprintf("%s %s", name, version)
+				if pretty != "" {
+					distro = pretty
+				} else {
+					distro = strings.TrimSpace(name + " " + version)
+				}
 			}
+			asciiName = firstNonEmpty(info["NAME"], info["ID"], pretty)
 		case utils.FileExists("/etc/debian_version"):
 			ver := utils.ReadFirstLine("/etc/debian_version")
 			distro = "Debian " + ver
@@ -93,9 +97,40 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 		distro += " " + machine_arch
 	}
 
-	if ascii_distro == utils.AUTO {
-		ascii_distro = strings.TrimSpace(distro)
+	switch ascii_distro {
+	case "", utils.AUTO:
+		if asciiName != "" {
+			ascii_distro = asciiName
+		} else {
+			ascii_distro = strings.TrimSpace(distro)
+		}
 	}
 
-	return distro, ascii_distro
+	return strings.TrimSpace(distro), strings.TrimSpace(ascii_distro)
+}
+
+func parseOSRelease(path string) map[string]string {
+	content, _ := os.ReadFile(path)
+	info := map[string]string{}
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		info[parts[0]] = strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+	}
+	return info
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

@@ -350,9 +350,8 @@ func PrintMem(osName string, mem configs.Memory, bar configs.ProgressBar) string
 	}
 
 	info, err := GetMemory(osName, config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting memory info: %v\n", err)
-		os.Exit(1)
+	if err != nil || info == nil {
+		return ""
 	}
 	return info.Formatted
 }

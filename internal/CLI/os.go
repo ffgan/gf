@@ -13,7 +13,7 @@ func GetOS(kernelName, darwin_name string) string {
 
 	switch {
 	case kernelName == Darwin:
-		// TODO: https://github.com/ffgan/hyfetch/blob/master/neofetch#L6384
+		osName = Darwin
 
 	case kernelName == SunOS:
 		out, err := utils.CommandOutput("uname", "-o")
@@ -62,9 +62,8 @@ func GetOS(kernelName, darwin_name string) string {
 		osName = Windows
 
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown OS detected: '%s', aborting...\n", kernelName)
-		fmt.Fprintln(os.Stderr, "Open an issue on GitHub to add support for your OS.")
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "gf: unknown OS %q, showing the kernel name\n", kernelName)
+		osName = kernelName
 	}
 
 	return osName

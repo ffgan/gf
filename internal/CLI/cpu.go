@@ -10,24 +10,40 @@ import (
 	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetCPU(OS, Machine, ShowCores, ShowSpeed, ShowTemp, ShowBrand, CoreType, SpeedShort, TempUnit string) string {
+func GetCPU(OS, Machine, ShowCores, ShowSpeed, ShowTemp, ShowBrand, speedType, SpeedShort, TempUnit string) string {
 	var showCores bool
 	var showSpeed bool
 	var showTemp bool
 	var showBrand bool
 	var speedShort bool
-	var tempUnit string // "C" or "F"
 
-	if ShowCores == utils.ON {
+	coreType := "logical"
+	switch ShowCores {
+	case "physical":
 		showCores = true
+		coreType = "physical"
+	case utils.OFF:
+		showCores = false
+	default:
+		// "logical", "on", and the neofetch default all show logical cores.
+		showCores = true
+		coreType = "logical"
 	}
 
 	if ShowSpeed == utils.ON {
 		showSpeed = true
 	}
 
-	if ShowTemp == utils.ON {
+	tempUnit := "C"
+	switch ShowTemp {
+	case utils.ON, "C":
 		showTemp = true
+	case "F":
+		showTemp = true
+		tempUnit = "F"
+	}
+	if TempUnit == "F" {
+		tempUnit = "F"
 	}
 
 	if ShowBrand == utils.ON {
@@ -37,13 +53,17 @@ func GetCPU(OS, Machine, ShowCores, ShowSpeed, ShowTemp, ShowBrand, CoreType, Sp
 	if SpeedShort == utils.ON {
 		speedShort = true
 	}
+	if speedType == "" {
+		speedType = "bios_limit"
+	}
 
 	config := CPUConfig{
 		ShowCores:  showCores,
 		ShowSpeed:  showSpeed,
 		ShowTemp:   showTemp,
 		ShowBrand:  showBrand,
-		CoreType:   CoreType,
+		CoreType:   coreType,
+		SpeedType:  speedType,
 		SpeedShort: speedShort,
 		TempUnit:   tempUnit,
 	}
@@ -66,15 +86,15 @@ type CPUConfig struct {
 	ShowTemp   bool
 	ShowBrand  bool
 	CoreType   string // "logical" or "physical"
+	SpeedType  string
 	SpeedShort bool
 	TempUnit   string // "C" or "F"
 }
 
 func getCPU(OS, Machine string, config CPUConfig) string {
 	info, err := GetCPUInfo(OS, Machine, config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	if err != nil || info == nil || info.Name == "" {
+		return ""
 	}
 	return FormatCPUInfo(info, config)
 }
@@ -154,11 +174,33 @@ func getCPULinux(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 			}
 		}
 		info.Cores = len(coreIDs)
+		if info.Cores == 0 {
+			for _, line := range lines {
+				if strings.HasPrefix(line, "processor") {
+					info.Cores++
+				}
+			}
+		}
 	}
 
-	// Get CPU speed
-	speedFile := "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
-	if data, err := os.ReadFile(speedFile); err == nil {
+	// Get CPU speed. speed_type selects a cpufreq file; bios_limit is neofetch's default.
+	speedName := config.SpeedType
+	if speedName == "" {
+		speedName = "bios_limit"
+	}
+	candidates := []string{
+		"/sys/devices/system/cpu/cpu0/cpufreq/" + speedName,
+		"/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
+		"/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
+	}
+	var speedFile string
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			speedFile = candidate
+			break
+		}
+	}
+	if data, err := os.ReadFile(speedFile); err == nil && speedFile != "" {
 		if speed, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
 			info.Speed = speed / 1000 // Convert KHz to MHz
 		}
@@ -347,15 +389,7 @@ func FormatCPUInfo(info *CPUInfo, config CPUConfig) string {
 
 	// Add speed
 	if config.ShowSpeed && info.Speed > 0 {
-		if info.Speed < 1000 {
-			cpu = fmt.Sprintf("%s @ %dMHz", cpu, info.Speed)
-		} else {
-			speed := float64(info.Speed)
-			if config.SpeedShort {
-				speed = float64(info.Speed / 100)
-			}
-			cpu = fmt.Sprintf("%s @ %.1fGHz", cpu, speed/10.0)
-		}
+		cpu = fmt.Sprintf("%s @ %s", cpu, formatSpeed(info.Speed, config.SpeedShort))
 	}
 
 	// Add temperature
@@ -368,4 +402,15 @@ func FormatCPUInfo(info *CPUInfo, config CPUConfig) string {
 	}
 
 	return cpu
+}
+
+func formatSpeed(mhz int, shorthand bool) string {
+	if mhz < 1000 {
+		return fmt.Sprintf("%dMHz", mhz)
+	}
+	ghz := float64(mhz) / 1000
+	if shorthand {
+		return fmt.Sprintf("%.1fGHz", ghz)
+	}
+	return fmt.Sprintf("%.3fGHz", ghz)
 }

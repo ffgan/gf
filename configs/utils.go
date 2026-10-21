@@ -8,9 +8,22 @@ import (
 var tagToField = map[string]string{}
 
 func init() {
-	t := reflect.TypeOf(Title{})
+	registerTags(reflect.TypeOf(Config{}))
+	tagToField["mem_precision"] = tagToField["memory_precision"]
+}
+
+func registerTags(t reflect.Type) {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return
+	}
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			registerTags(field.Type)
+		}
 		tag := field.Tag.Get("gf")
 		if tag != "" {
 			tagToField[tag] = field.Name

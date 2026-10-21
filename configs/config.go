@@ -48,7 +48,7 @@ type Uptime struct {
 type Memory struct {
 	MemoryPercent string `gf:"memory_percent"`
 	MemoryUnit    string `gf:"memory_unit"`
-	MemPrecision  string `gf:"mem_precision"`
+	MemPrecision  string `gf:"memory_precision"`
 }
 
 type Packages struct {
@@ -128,7 +128,7 @@ type TextOptions struct {
 
 type ColorBlocks struct {
 	BlockRange  string `gf:"block_range"`
-	ColorBlocks string `gf:"color_blocks"`
+	Enabled     string `gf:"color_blocks"`
 	BlockWidth  string `gf:"block_width"`
 	BlockHeight string `gf:"block_height"`
 	ColOffset   string `gf:"col_offset"`

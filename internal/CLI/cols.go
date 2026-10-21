@@ -84,7 +84,7 @@ func GetCols(params ColorBlocksParams, leftMax int) ColorBlocksResult {
 	if blocks2Str != "" {
 		// Add reset code after the blocks: ESC[0m (reset all attributes)
 		// BUG: On some terminals, the blocks may shift left by one column
-		if term == "vscode" {
+		if params.Term == "vscode" {
 			leftMax += 1
 		}
 		row := fmt.Sprintf("\033[%dC", leftMax) + strings.ReplaceAll(blockSpaces, " ", blocks2Str+"\033[0mnl")
@@ -133,6 +133,47 @@ func GetCols(params ColorBlocksParams, leftMax int) ColorBlocksResult {
 	result.Prin = 1
 
 	return result
+}
+
+// RenderBlocks draws the neofetch color bar. Colors 0-7 use the classic
+// palette and 8+ use 256-color indexes. height repeats each row.
+func RenderBlocks(width, height, start, end int) []string {
+	if width <= 0 {
+		width = 3
+	}
+	if height <= 0 {
+		height = 1
+	}
+	if end < start {
+		start, end = 0, 15
+	}
+	block := strings.Repeat(" ", width)
+	var low, high strings.Builder
+	for i := start; i <= end; i++ {
+		if i >= 0 && i <= 7 {
+			fmt.Fprintf(&low, "\033[3%d;4%dm%s", i, i, block)
+		} else if i >= 0 {
+			fmt.Fprintf(&high, "\033[38;5;%d;48;5;%dm%s", i, i, block)
+		}
+	}
+	if low.Len() > 0 {
+		low.WriteString("\033[0m")
+	}
+	if high.Len() > 0 {
+		high.WriteString("\033[0m")
+	}
+	var rows []string
+	for n := 0; n < height; n++ {
+		if low.Len() > 0 {
+			rows = append(rows, low.String())
+		}
+	}
+	for n := 0; n < height; n++ {
+		if high.Len() > 0 {
+			rows = append(rows, high.String())
+		}
+	}
+	return rows
 }
 
 func Getcols(leftMax int) string {

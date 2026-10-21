@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -16,10 +17,20 @@ type PkgInfo struct {
 	Count   int
 }
 
-func DetectPackages(osname string) string {
-	// TODO: 修复与hyfetch不一致的地方
-	// Packages: 227 (pip), 2699 (rpm), 25 (flatpak)
-	// Packages: 227 (pip), 2699 (rpm), 19 (flatpak-system), 6 (flatpak-user)
+// PackageConfig selects how package counts are gathered and printed.
+type PackageConfig struct {
+	Managers string
+	Separate bool
+	Minimal  bool
+}
+
+func DetectPackages(osname string, cfg PackageConfig) string {
+	// on:   '227 (pip), 2699 (rpm), 19 (flatpak-system), 6 (flatpak-user)'
+	// tiny: '2945 (pip, rpm, flatpak)'
+	// off:  '2945'
+	if cfg.Managers == "" {
+		cfg.Managers = utils.ON
+	}
 	managers := []PkgInfo{}
 	add := func(manager string, count int) {
 		if count > 0 {
@@ -28,13 +39,13 @@ func DetectPackages(osname string) string {
 	}
 
 	// --- Language package managers ---
-	if utils.CommandExists("pipx") {
+	if !cfg.Minimal && utils.CommandExists("pipx") {
 		add("pipx", utils.GetPkgCount("pipx", "list", "--short"))
 	}
-	if utils.CommandExists("pip") {
+	if !cfg.Minimal && utils.CommandExists("pip") {
 		add("pip", utils.GetPkgCount("pip", "freeze"))
 	}
-	if utils.CommandExists("cargo") {
+	if !cfg.Minimal && utils.CommandExists("cargo") {
 		out, _ := utils.CommandOutput("cargo", "install", "--list")
 		lines := 0
 		sc := bufio.NewScanner(bytes.NewReader(out))
@@ -45,7 +56,7 @@ func DetectPackages(osname string) string {
 		}
 		add("cargo", lines)
 	}
-	if utils.CommandExists("npm") {
+	if !cfg.Minimal && utils.CommandExists("npm") {
 		if st, err := os.Stat("/usr/lib/node_modules"); err == nil && st.IsDir() {
 			add("npm", utils.FilePathGlobLens("/usr/lib/node_modules/*/"))
 		} else if st, err := os.Stat("/usr/local/lib/node_modules"); err == nil && st.IsDir() {
@@ -58,7 +69,7 @@ func DetectPackages(osname string) string {
 			}
 		}
 	}
-	if utils.CommandExists("pnpm") {
+	if !cfg.Minimal && utils.CommandExists("pnpm") {
 		p := filepath.Join(os.Getenv("HOME"), ".local/share/pnpm/global/5/node_modules/*/")
 		add("pnpm", utils.FilePathGlobLens(p))
 	}
@@ -79,7 +90,12 @@ func DetectPackages(osname string) string {
 			add("rpm", utils.GetPkgCount("rpm", "-qa", "--nodigest", "--nosignature"))
 		}
 		if utils.CommandExists("flatpak") {
-			add("flatpak", utils.GetPkgCount("flatpak", "list"))
+			if cfg.Separate {
+				add("flatpak-system", utils.GetPkgCount("flatpak", "list", "--system"))
+				add("flatpak-user", utils.GetPkgCount("flatpak", "list", "--user"))
+			} else {
+				add("flatpak", utils.GetPkgCount("flatpak", "list"))
+			}
 		}
 		if utils.CommandExists("snap") {
 			add("snap", utils.GetPkgCount("snap", "list"))
@@ -117,14 +133,24 @@ func DetectPackages(osname string) string {
 		total += m.Count
 	}
 
-	if len(managers) == 0 {
-		return "No packages found"
-	}
-	res := []string{}
-
-	for _, m := range managers {
-		res = append(res, fmt.Sprintf("%d (%s)", m.Count, m.Manager))
+	if len(managers) == 0 || total == 0 {
+		return ""
 	}
 
-	return strings.Join(res, ", ")
+	switch cfg.Managers {
+	case utils.OFF:
+		return strconv.Itoa(total)
+	case "tiny":
+		names := make([]string, 0, len(managers))
+		for _, m := range managers {
+			names = append(names, m.Manager)
+		}
+		return fmt.Sprintf("%d (%s)", total, strings.Join(names, ", "))
+	default:
+		res := make([]string, 0, len(managers))
+		for _, m := range managers {
+			res = append(res, fmt.Sprintf("%d (%s)", m.Count, m.Manager))
+		}
+		return strings.Join(res, ", ")
+	}
 }

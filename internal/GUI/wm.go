@@ -55,6 +55,10 @@ func GetWM(osName, kernelName string) string {
 	if wm == "" && display != "" && osName != cli.MacOSX && osName != cli.MacOS && osName != cli.FreeMiNT {
 		wm = utils.ScanProcesses(psFlags, []string{
 			"sowm", "catwm", "fvwm", "dwm", "2bwm", "monsterwm", "tinywm", "x11fs", "xmonad",
+			"xfwm4", "openbox", "i3", "mutter", "kwin_x11", "kwin_wayland", "awesome",
+			"bspwm", "herbstluftwm", "qtile", "leftwm", "spectrwm", "icewm", "fluxbox",
+			"jwm", "pekwm", "marco", "muffin", "compiz", "enlightenment", "cinnamon",
+			"sway", "Hyprland", "wayfire", "river", "weston", "labwc", "cage",
 		})
 		if wm == "" && utils.CommandExists("xprop") {
 			id := getRootWindowID()
@@ -121,6 +125,16 @@ func GetWM(osName, kernelName string) string {
 	}
 
 	// --- normalize names ---
+	switch wm {
+	case "xfwm4":
+		wm = "Xfwm4"
+	case "kwin_x11", "kwin_wayland":
+		wm = "KWin"
+	case "mutter":
+		wm = "Mutter"
+	case "openbox":
+		wm = "Openbox"
+	}
 	if strings.Contains(wm, "WINDOWMAKER") {
 		wm = "wmaker"
 	}

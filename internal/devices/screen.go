@@ -12,7 +12,7 @@ import (
 	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetResolution(osName, machine string) string {
+func GetResolution(osName, machine string, refresh bool) string {
 	var resolution string
 
 	switch osName {
@@ -25,7 +25,7 @@ func GetResolution(osName, machine string) string {
 	case cli.Haiku:
 		resolution = getResolutionHaiku()
 	default:
-		resolution = getResolutionX11()
+		resolution = getResolutionX11(refresh)
 	}
 
 	resolution = strings.TrimSuffix(resolution, ",")
@@ -151,15 +151,29 @@ func getResolutionHaiku() string {
 }
 
 // --- Linux/X11 ---
-func getResolutionX11() string {
-	// 优先使用 xrandr
-	if utils.PathExists("xrandr") && os.Getenv("DISPLAY") != "" && os.Getenv("WAYLAND_DISPLAY") == "" {
+func getResolutionX11(refresh bool) string {
+	if utils.CommandExists("xrandr") && os.Getenv("DISPLAY") != "" && os.Getenv("WAYLAND_DISPLAY") == "" {
 		out, err := utils.CommandOutput("xrandr", "--nograb", "--current")
 		if err != nil {
 			return ""
 		}
+		text := string(out)
+		if refresh {
+			re := regexp.MustCompile(`(?m)^\s*([0-9]+)x([0-9]+)\s+([0-9.]+)\*`)
+			matches := re.FindAllStringSubmatch(text, -1)
+			var list []string
+			for _, m := range matches {
+				if len(m) > 3 {
+					hz := strings.TrimSuffix(m[3], ".00")
+					list = append(list, fmt.Sprintf("%sx%s @ %sHz", m[1], m[2], hz))
+				}
+			}
+			if len(list) > 0 {
+				return strings.Join(list, ", ")
+			}
+		}
 		re := regexp.MustCompile(`([0-9]+)x([0-9]+)\+`)
-		matches := re.FindAllStringSubmatch(string(out), -1)
+		matches := re.FindAllStringSubmatch(text, -1)
 		var list []string
 		for _, m := range matches {
 			if len(m) > 2 {
@@ -170,7 +184,7 @@ func getResolutionX11() string {
 	}
 
 	// fallback: xdpyinfo
-	if utils.PathExists("xdpyinfo") && os.Getenv("DISPLAY") != "" {
+	if utils.CommandExists("xdpyinfo") && os.Getenv("DISPLAY") != "" {
 		out, err := utils.CommandOutput("xdpyinfo")
 		if err == nil {
 			re := regexp.MustCompile(`dimensions:\s+([0-9]+x[0-9]+)`)

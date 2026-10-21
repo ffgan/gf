@@ -3,7 +3,6 @@ package configs
 import (
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -116,7 +115,7 @@ func DefaultConfig() Config {
 		},
 		ColorBlocks: ColorBlocks{
 			BlockRange:  "(0 15)",
-			ColorBlocks: utils.ON,
+			Enabled:     utils.ON,
 			BlockWidth:  "3",
 			BlockHeight: "1",
 			ColOffset:   utils.AUTO,
@@ -178,7 +177,13 @@ func DefaultConfig() Config {
 				{"Terminal Font", "term_font"},
 				{"CPU", "cpu"},
 				{"GPU", "gpu"},
+				{"GPU Driver", "gpu_driver"},
 				{"Memory", "memory"},
+				{"Disk", "disk"},
+				{"Battery", "battery"},
+				{"Local IP", "local_ip"},
+				{"Locale", "locale"},
+				{"Users", "users"},
 				{"Network", "network"},
 				{"Bluetooth", "bluetooth"},
 				{"BIOS", "bios"},
@@ -204,60 +209,90 @@ func ParseConfig(data string, config *Config) error {
 	print_info_lines_end := -1
 
 	for i, line := range real_lines {
-		if line == "print_info() {" {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "print_info() {" || trimmed == "print_info(){" {
 			print_info_lines_start = i
 		}
-		if line == "}" {
+		if trimmed == "}" && print_info_lines_start != -1 && print_info_lines_end == -1 {
 			print_info_lines_end = i
 		}
 	}
 
-	if print_info_lines_start == -1 {
-		return fmt.Errorf("invalid config format,cannot find print_info block's start")
+	if print_info_lines_start == -1 || print_info_lines_end == -1 || print_info_lines_end < print_info_lines_start {
+		config_list := real_lines
+		return applyAssignments(config, config_list)
 	}
 
-	if print_info_lines_end == -1 {
-		return fmt.Errorf("invalid config format,cannot find print_info block's end")
-	}
-
-	if config.InfoList == nil {
-		for i := print_info_lines_start + 1; i < print_info_lines_end; i++ {
-			var info_line_list []string
-			if strings.Contains(real_lines[i], "\"") {
-				var tmp []string
-				info_line_list = strings.Split(real_lines[i], "\"")
-				for _, item := range info_line_list {
-					item = strings.TrimSpace(item)
-					tmp = append(tmp, item)
-				}
-				info_line_list = tmp
-			} else {
-				info_line_list = strings.Split(real_lines[i], " ")
-			}
+	config.InfoList = nil
+	for i := print_info_lines_start + 1; i < print_info_lines_end; i++ {
+		var info_line_list []string
+		if strings.Contains(real_lines[i], "\"") {
 			var tmp []string
+			info_line_list = strings.Split(real_lines[i], "\"")
 			for _, item := range info_line_list {
-				if item == "" || item == "info" {
-					continue
-				}
-				tmp = append(tmp, strings.ReplaceAll(item, "\"", ""))
+				item = strings.TrimSpace(item)
+				tmp = append(tmp, item)
 			}
-
-			config.InfoList = append(config.InfoList, tmp)
+			info_line_list = tmp
+		} else {
+			info_line_list = strings.Split(real_lines[i], " ")
 		}
+		var tmp []string
+		for _, item := range info_line_list {
+			if item == "" || item == "info" {
+				continue
+			}
+			tmp = append(tmp, strings.ReplaceAll(item, "\"", ""))
+		}
+
+		config.InfoList = append(config.InfoList, tmp)
 	}
+	return applyAssignments(config, real_lines[print_info_lines_end+1:])
+}
 
-	config_list := real_lines[print_info_lines_end+1:]
-
-	t := reflect.ValueOf(config)
-
-	for _, line := range config_list {
+func applyAssignments(config *Config, lines []string) error {
+	for _, line := range lines {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue
 		}
 		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		_ = SetByGFTag(&t, key, value)
+		value := cleanConfigValue(parts[1])
+		_ = SetByGFTag(config, key, value)
 	}
 	return nil
+}
+
+func cleanConfigValue(value string) string {
+	value = strings.TrimSpace(value)
+	if i := commentIndex(value); i >= 0 {
+		value = strings.TrimSpace(value[:i])
+	}
+	if len(value) >= 2 {
+		if (value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'') {
+			value = value[1 : len(value)-1]
+		}
+	}
+	return strings.TrimSpace(value)
+}
+
+func commentIndex(value string) int {
+	inSingle, inDouble := false, false
+	for i := 0; i < len(value); i++ {
+		switch value[i] {
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+			}
+		case '#':
+			if !inSingle && !inDouble {
+				return i
+			}
+		}
+	}
+	return -1
 }

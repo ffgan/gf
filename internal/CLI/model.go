@@ -48,6 +48,12 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 		} else if utils.PathExists("/tmp/sysinfo/model") {
 			model = utils.ReadFileTrim("/tmp/sysinfo/model")
 		}
+		if strings.TrimSpace(model) == "" {
+			virt := utils.RunCommand("systemd-detect-virt")
+			if virt != "" && virt != "none" && virt != "container" {
+				model = strings.ToUpper(virt)
+			}
+		}
 
 	case MacOSX, MacOS, RavynOS:
 		arch := utils.RunCommand("arch")
