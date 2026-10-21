@@ -53,6 +53,7 @@ type hardware struct {
 
 	cpu string
 	gpu string
+	npu string
 
 	memory string
 
@@ -178,6 +179,10 @@ func (h *hardware) Get_cpu() {
 
 func (h *hardware) Get_gpu() {
 	h.gpu = dev.GetGPU(h.os, h.GPUBrand, h.GPUType)
+}
+
+func (h *hardware) Get_npu() {
+	h.npu = dev.GetAccel()
 }
 
 func (h *hardware) Get_memory() {

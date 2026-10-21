@@ -16,7 +16,7 @@ func GetResolution(osName, machine string, refresh bool) string {
 	var resolution string
 
 	switch osName {
-	case cli.MacOS:
+	case cli.MacOS, cli.MacOSX, cli.Darwin:
 		resolution = getResolutionMac()
 	case cli.Iphone:
 		resolution = getResolutionIOS(machine)
@@ -207,8 +207,23 @@ func getResolutionX11(refresh bool) string {
 				}
 			}
 		}
-		return strings.Join(list, ", ")
+		if joined := strings.Join(list, ", "); joined != "" {
+			return joined
+		}
 	}
 
-	return ""
+	return resolutionFromFB()
+}
+
+func resolutionFromFB() string {
+	data, err := os.ReadFile("/sys/class/graphics/fb0/virtual_size")
+	if err != nil {
+		return ""
+	}
+	s := strings.TrimSpace(string(data))
+	s = strings.ReplaceAll(s, ",", "x")
+	if !strings.Contains(s, "x") || s == "0x0" {
+		return ""
+	}
+	return s
 }

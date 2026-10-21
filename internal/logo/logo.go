@@ -126,6 +126,22 @@ var idAliases = map[string]string{
 	"deepin":              "Deepin",
 	"kde neon":            "KDE",
 	"neon":                "KDE",
+	"uos":                 "Uos",
+	"uniontech":           "Uos",
+	"kylin":               "Ubuntu Kylin",
+	"openkylin":           "openKylin",
+	"openeuler":           "openEuler",
+	"euleros":             "openEuler",
+	"harmonyos":           "Android",
+	"openharmony":         "Android",
+	"hyperos":             "Android",
+	"anolis":              "CentOS",
+	"opencloudos":         "CentOS",
+	"loongnix":            "Debian",
+	"openwrt":             "Wrt",
+	"raspios":             "Raspbian",
+	"raspberrypi":         "Raspbian",
+	"raspberry pi os":     "Raspbian",
 }
 
 // Resolve finds the logo record for a distro name, ID, or pretty name.

@@ -21,14 +21,18 @@ func GetMemory(osName string, config *MemoryConfig) (*MemoryInfo, error) {
 		memUsed, memTotal, err = getMemoryLinux()
 	case Darwin:
 		memUsed, memTotal, err = getMemoryDarwin()
-	case FreeBSD, OpenBSD, NetBSD, DragonFly:
+	case FreeBSD, OpenBSD, NetBSD, DragonFly, BSD, Bitrig:
 		memUsed, memTotal, err = getMemoryBSD(osName)
-	case Solaris:
+	case Solaris, illumos:
 		memUsed, memTotal, err = getMemorySolaris()
 	case Windows:
 		memUsed, memTotal, err = getMemoryWindows()
 	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", osName)
+		if _, statErr := os.Stat("/proc/meminfo"); statErr == nil {
+			memUsed, memTotal, err = getMemoryLinux()
+		} else {
+			return nil, fmt.Errorf("unsupported operating system: %s", osName)
+		}
 	}
 
 	if err != nil {

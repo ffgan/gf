@@ -31,23 +31,9 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 
 	switch osName {
 	case Linux:
-		if utils.PathExists("/android/system/") || utils.PathExists("/system/app/") {
-			model = fmt.Sprintf("%s %s",
-				utils.RunCommand("getprop", "ro.product.brand"),
-				utils.RunCommand("getprop", "ro.product.model"))
-		} else if utils.PathExists("/sys/devices/virtual/dmi/id/product_name") ||
-			utils.PathExists("/sys/devices/virtual/dmi/id/product_version") {
-			model = utils.ReadFileTrim("/sys/devices/virtual/dmi/id/product_name") + " " +
-				utils.ReadFileTrim("/sys/devices/virtual/dmi/id/product_version")
-		} else if utils.PathExists("/sys/devices/virtual/dmi/id/board_vendor") ||
-			utils.PathExists("/sys/devices/virtual/dmi/id/board_name") {
-			model = utils.ReadFileTrim("/sys/devices/virtual/dmi/id/board_vendor") + " " +
-				utils.ReadFileTrim("/sys/devices/virtual/dmi/id/board_name")
-		} else if utils.PathExists("/sys/firmware/devicetree/base/model") {
-			model = utils.ReadFileTrim("/sys/firmware/devicetree/base/model")
-		} else if utils.PathExists("/tmp/sysinfo/model") {
-			model = utils.ReadFileTrim("/tmp/sysinfo/model")
-		}
+		// Empty DMI nodes still exist on many VMs. Skip junk values and
+		// keep going through the device tree, WSL, and the CPUID hypervisor.
+		model = PickHost(linuxHostInput())
 		if strings.TrimSpace(model) == "" {
 			virt := utils.RunCommand("systemd-detect-virt")
 			if virt != "" && virt != "none" && virt != "container" {
@@ -55,7 +41,7 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 			}
 		}
 
-	case MacOSX, MacOS, RavynOS:
+	case MacOSX, MacOS, RavynOS, Darwin:
 		arch := utils.RunCommand("arch")
 		isHackintosh := false
 		if arch != "arm64" {
@@ -81,15 +67,7 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 		}
 
 	case Iphone:
-		// Simplified mapping (full table omitted for brevity)
-		switch kernelMachine {
-		case "iPhone15,2":
-			model = "iPhone 14 Pro"
-		case "iPhone15,3":
-			model = "iPhone 14 Pro Max"
-		default:
-			model = kernelMachine
-		}
+		model = iphoneName(kernelMachine)
 
 	case BSD, MINIX:
 		if kernelName == "FreeBSD" {

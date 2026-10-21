@@ -107,6 +107,16 @@ func DetectPackages(osname string, cfg PackageConfig) string {
 				add("brew", utils.FilePathGlobLens(p1))
 			}
 		}
+		add("opkg", countOpkg())
+		add("emerge", countEmerge())
+		add("xbps", countXbps())
+		add("slackpkg", countSlack())
+		add("kiss", countKiss())
+		add("eopkg", countEopkg())
+		add("linglong", countLinglong())
+		add("guix", countGuix())
+		add("nix", countNix())
+		add("conda", countConda())
 	case Darwin:
 		if utils.CommandExists("brew") {
 			add("brew", utils.FilePathGlobLens("/usr/local/Cellar/*/"))

@@ -11,13 +11,17 @@ import (
 func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro string) (string, string) {
 	var distro string
 	var asciiName string
+	var releaseName, releaseID, releaseLike string
 
 	switch osName {
 	case Linux, BSD, MINIX, Ironclad:
 		switch {
 		case utils.FileExists("/etc/os-release"):
 			info := parseOSRelease("/etc/os-release")
-			name := info["NAME"]
+			releaseName = info["NAME"]
+			releaseID = info["ID"]
+			releaseLike = info["ID_LIKE"]
+			name := releaseName
 			if name == "" {
 				name = info["ID"]
 			}
@@ -39,6 +43,9 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 				}
 			}
 			asciiName = firstNonEmpty(info["NAME"], info["ID"], pretty)
+			if key := LogoKey(releaseName, releaseID); key != "" {
+				asciiName = key
+			}
 		case utils.FileExists("/etc/debian_version"):
 			ver := utils.ReadFirstLine("/etc/debian_version")
 			distro = "Debian " + ver
@@ -50,21 +57,7 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 		}
 	case Darwin:
 		out := utils.RunCommand("sw_vers", "-productVersion")
-		codename := "macOS"
-		version := out
-		switch {
-		case strings.HasPrefix(out, "10.15"):
-			codename = "macOS Catalina"
-		case strings.HasPrefix(out, "11"):
-			codename = "macOS Big Sur"
-		case strings.HasPrefix(out, "12"):
-			codename = "macOS Monterey"
-		case strings.HasPrefix(out, "13"):
-			codename = "macOS Ventura"
-		case strings.HasPrefix(out, "14"):
-			codename = "macOS Sonoma"
-		}
-		distro = fmt.Sprintf("%s %s", codename, version)
+		distro = fmt.Sprintf("%s %s", macOSCodename(out), out)
 	case Windows:
 		// For Windows, use PowerShell to query ProductName
 		psCmd := `Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object -ExpandProperty ProductName`
@@ -80,10 +73,25 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 		distro = utils.ReadFirstLine("/etc/release")
 	case Haiku:
 		distro = Haiku
-		// case AIX:
-		// 	distro = AIX + " " + kernelVersion
-		// default:
-		// 	distro = osName + " " + kernelVersion
+	}
+	if strings.TrimSpace(distro) == "" {
+		distro = osName
+	}
+	if osName == Linux {
+		distro = AnnotateDistro(strings.TrimSpace(distro), RuntimeTags(RuntimeSig{
+			ID:     releaseID,
+			IDLike: releaseLike,
+			Name:   releaseName,
+			Kernel: readSmall("/proc/version"),
+			Env: map[string]string{
+				"TERMUX_VERSION": os.Getenv("TERMUX_VERSION"),
+				"PREFIX":         os.Getenv("PREFIX"),
+				"ANDROID_ROOT":   os.Getenv("ANDROID_ROOT"),
+				"ANDROID_DATA":   os.Getenv("ANDROID_DATA"),
+			},
+			Exists: utils.PathExists,
+			Read:   readSmall,
+		}))
 	}
 	var machine_arch string
 	switch osName {
@@ -124,6 +132,27 @@ func parseOSRelease(path string) map[string]string {
 		info[parts[0]] = strings.Trim(strings.TrimSpace(parts[1]), `"'`)
 	}
 	return info
+}
+
+func macOSCodename(version string) string {
+	switch {
+	case strings.HasPrefix(version, "10.15"):
+		return "macOS Catalina"
+	case strings.HasPrefix(version, "11"):
+		return "macOS Big Sur"
+	case strings.HasPrefix(version, "12"):
+		return "macOS Monterey"
+	case strings.HasPrefix(version, "13"):
+		return "macOS Ventura"
+	case strings.HasPrefix(version, "14"):
+		return "macOS Sonoma"
+	case strings.HasPrefix(version, "15"):
+		return "macOS Sequoia"
+	case strings.HasPrefix(version, "26"):
+		return "macOS Tahoe"
+	default:
+		return "macOS"
+	}
 }
 
 func firstNonEmpty(values ...string) string {
