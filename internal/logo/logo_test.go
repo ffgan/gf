@@ -25,6 +25,11 @@ func TestResolveMoreDistros(t *testing.T) {
 		"Loongnix":        "Debian",
 		"Anolis OS":       "CentOS",
 		"Rocky Linux":     "rocky",
+		"archlinux":       "Arch",
+		"opensuse-leap":   "openSUSE_Leap",
+		"ghostbsd":        "GhostBSD",
+		"omnios":          "OmniOS",
+		"azurelinux":      "CBL-Mariner",
 	}
 	for name, file := range cases {
 		if got := Resolve(name).FileName; got != file {

@@ -48,7 +48,7 @@ func GetDE(osName, distro, kernel_name, showVersion string) string {
 	deRun = true
 
 	switch osName {
-	case cli.MacOSX, cli.MacOS:
+	case cli.MacOSX, cli.MacOS, cli.Darwin:
 		de = "Aqua"
 
 	case cli.RavynOS:

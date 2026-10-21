@@ -77,6 +77,9 @@ func TestLogoKey(t *testing.T) {
 		{"Raspberry Pi OS", "debian"}:  "Raspbian",
 		{"Rocky Linux", "rocky"}:       "rocky",
 		{"Ubuntu", "ubuntu"}:           "",
+		{"Arch Linux", "archlinux"}:    "Arch",
+		{"openSUSE", "opensuse-leap"}:  "openSUSE Leap",
+		{"GhostBSD", "ghostbsd"}:       "GhostBSD",
 	}
 	for in, want := range cases {
 		if got := LogoKey(in[0], in[1]); got != want {

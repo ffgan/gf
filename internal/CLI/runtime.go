@@ -162,6 +162,9 @@ func RuntimeTags(s RuntimeSig) []string {
 func LogoKey(name, id string) string {
 	key := strings.ToLower(strings.TrimSpace(id))
 	lowName := strings.ToLower(strings.TrimSpace(name))
+	if art, ok := distroLogoIDs[key]; ok {
+		return art
+	}
 	switch key {
 	case "uos", "uniontech":
 		return "Uos"
@@ -207,6 +210,98 @@ func LogoKey(name, id string) string {
 		return "CentOS"
 	}
 	return ""
+}
+
+// distroLogoIDs maps os-release IDs whose spelling is not the logo key.
+var distroLogoIDs = map[string]string{
+	"amzn":                "Amazon",
+	"amazonlinux":         "Amazon",
+	"ol":                  "Oracle",
+	"oraclelinux":         "Oracle",
+	"ubuntu-mate":         "Ubuntu MATE",
+	"ubuntumate":          "Ubuntu MATE",
+	"ubuntu-budgie":       "Ubuntu Budgie",
+	"ubuntubudgie":        "Ubuntu Budgie",
+	"ubuntu-studio":       "Ubuntu Studio",
+	"ubuntustudio":        "Ubuntu Studio",
+	"ubuntu-cinnamon":     "Ubuntu Cinnamon",
+	"ubuntucinnamon":      "Ubuntu Cinnamon",
+	"ubuntu-kylin":        "Ubuntu Kylin",
+	"ubuntukylin":         "Ubuntu Kylin",
+	"ubuntu-touch":        "Ubuntu Touch",
+	"ubuntu-sway":         "Ubuntu Sway",
+	"ubuntusway":          "Ubuntu Sway",
+	"linuxlite":           "Linux Lite",
+	"linux-lite":          "Linux Lite",
+	"fedora-silverblue":   "Fedora Silverblue",
+	"silverblue":          "Fedora Silverblue",
+	"fedora-kinoite":      "Fedora Kinoite",
+	"kinoite":             "Fedora Kinoite",
+	"fedora-sericea":      "Fedora Sericea",
+	"sericea":             "Fedora Sericea",
+	"fedora-coreos":       "Fedora CoreOS",
+	"clear-linux-os":      "Clear Linux OS",
+	"clearlinux":          "Clear Linux OS",
+	"cbl-mariner":         "CBL-Mariner",
+	"mariner":             "CBL-Mariner",
+	"opensuse-slowroll":   "openSUSE Tumbleweed-Slowroll",
+	"slowroll":            "openSUSE Tumbleweed-Slowroll",
+	"sles":                "SUSE",
+	"sled":                "SUSE",
+	"suse":                "SUSE",
+	"aosc":                "AOSC OS",
+	"aosc-os":             "AOSC OS",
+	"archlabs":            "ARCHlabs",
+	"crystal-linux":       "Crystal Linux",
+	"rebornos":            "Reborn OS",
+	"ultramarine":         "Ultramarine Linux",
+	"sourcemage":          "Source Mage",
+	"rhinolinux":          "Rhino Linux",
+	"rhino":               "Rhino Linux",
+	"vanillaos":           "Vanilla",
+	"parrotos":            "Parrot",
+	"sailfishos":          "Sailfish",
+	"chromeos":            "Chrom",
+	"chromiumos":          "Chrom",
+	"pmos":                "PostMarketOS",
+	"mx-linux":            "MX",
+	"midnightbsd":         "FreeBSD",
+	"pfsense":             "FreeBSD",
+	"astra":               "Astra Linux",
+	"astralinux":          "Astra Linux",
+	"miraclelinux":        "MIRACLE LINUX",
+	"calculate":           "Calculate",
+	"calculate-linux":     "Calculate",
+	"lfs":                 "LinuxFromScratch",
+	"linuxfromscratch":    "LinuxFromScratch",
+	"instantos":           "instantOS",
+	"kde-neon":            "KDE",
+	"linuxmint":           "Linux Mint",
+	"pop":                 "Pop!_OS",
+	"neon":                "KDE",
+	"archlinux":           "Arch",
+	"archlinuxarm":        "Arch",
+	"archarm":             "Arch",
+	"alarm":               "Arch",
+	"manjaro-arm":         "Manjaro",
+	"sles_sap":            "SUSE",
+	"suse_sap":            "SUSE",
+	"opensuse-leap":       "openSUSE Leap",
+	"opensuse-tumbleweed": "openSUSE Tumbleweed",
+	"opensuse-microos":    "openSUSE",
+	"suse-microos":        "openSUSE",
+	"guixsystem":          "Guix",
+	"azurelinux":          "CBL-Mariner",
+	"immortalwrt":         "Wrt",
+	"librewrt":            "Wrt",
+	"pidora":              "Fedora",
+	"ghostbsd":            "GhostBSD",
+	"hardenedbsd":         "HardenedBSD",
+	"nomadbsd":            "NomadBSD",
+	"opnsense":            "OPNsense",
+	"omnios":              "OmniOS",
+	"openindiana":         "OpenIndiana",
+	"smartos":             "SmartOS",
 }
 
 func AnnotateDistro(distro string, tags []string) string {

@@ -116,6 +116,9 @@ func GetCPUInfo(OS, Machine string, config CPUConfig) (*CPUInfo, error) {
 	case Solaris, illumos:
 		return getCPUSolaris(info, config)
 	default:
+		if isBSDFamily(OS) {
+			return getCPUBSD(info, config)
+		}
 		if utils.FileExists("/proc/cpuinfo") {
 			return getCPULinux(info, config)
 		}

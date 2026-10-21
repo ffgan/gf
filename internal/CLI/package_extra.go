@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"github.com/ffgan/gf/internal/utils"
 )
 
 func countPrefixedLines(paths []string, prefix string) int {
@@ -24,6 +27,33 @@ func countPrefixedLines(paths []string, prefix string) int {
 		return n
 	}
 	return 0
+}
+
+func countApkDB() int {
+	return countPrefixedLines([]string{
+		"/lib/apk/db/installed",
+		"/var/lib/apk/db/installed",
+		"/usr/lib/apk/db/installed",
+	}, "P:")
+}
+
+// countPkgDB counts FreeBSD/DragonFly packages. pkgng stores them in
+// local.sqlite; older installs are one directory per package.
+func countPkgDB(root string) int {
+	db := filepath.Join(root, "local.sqlite")
+	if st, err := os.Stat(db); err == nil && !st.IsDir() && utils.CommandExists("sqlite3") {
+		out, err := utils.CommandOutput("sqlite3", db, "SELECT COUNT(*) FROM packages;")
+		if err == nil {
+			if n, conv := strconv.Atoi(strings.TrimSpace(string(out))); conv == nil {
+				return n
+			}
+		}
+	}
+	return countDirs(root)
+}
+
+func countFreeBSDPkg() int {
+	return countPkgDB("/var/db/pkg")
 }
 
 func countOpkg() int {

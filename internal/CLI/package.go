@@ -85,6 +85,8 @@ func DetectPackages(osname string, cfg PackageConfig) string {
 		}
 		if utils.CommandExists("apk") {
 			add("apk", utils.GetPkgCount("apk", "info"))
+		} else {
+			add("apk", countApkDB())
 		}
 		if utils.CommandExists("rpm") {
 			add("rpm", utils.GetPkgCount("rpm", "-qa", "--nodigest", "--nosignature"))
@@ -117,6 +119,34 @@ func DetectPackages(osname string, cfg PackageConfig) string {
 		add("guix", countGuix())
 		add("nix", countNix())
 		add("conda", countConda())
+		add("pkgsrc", countDirs("/usr/pkg/pkgdb"))
+		add("pacstall", countDirs("/var/lib/pacstall/metadata"))
+		add("paludis", countNestedDirs("/var/db/paludis/repositories"))
+		add("tazpkg", countDirs("/var/lib/tazpkg/installed"))
+		add("sorcery", countFiles("/var/state/sorcery/packages"))
+		add("cards", countFiles("/var/lib/pkg/db"))
+		add("scratch", countDirs("/var/lib/scratchpkg/db"))
+		add("ipkg", countPrefixedLines([]string{"/usr/lib/ipkg/status", "/var/lib/ipkg/status"}, "Package:"))
+		add("moss", countDirs("/var/db/moss/pkgs"))
+		if home := os.Getenv("HOME"); home != "" {
+			add("am", countDirs(filepath.Join(home, ".local/share/am")))
+		}
+	case FreeBSD, DragonFly, BSD, "MidnightBSD", "HardenedBSD", "GhostBSD", "NomadBSD":
+		add("pkg", countFreeBSDPkg())
+	case OpenBSD:
+		add("pkg_add", countDirs("/var/db/pkg"))
+	case NetBSD:
+		add("pkgin", countDirs("/usr/pkg/pkgdb"))
+	case Haiku:
+		add("pkgman", countSuffix("/boot/system/packages", ".hpkg"))
+	case Solaris, illumos:
+		add("pkg", countDirs("/var/sadm/pkg"))
+	case MINIX:
+		add("pkgin", countDirs("/usr/pkg/pkgdb"))
+	default:
+		if isBSDFamily(osname) {
+			add("pkg", countFreeBSDPkg())
+		}
 	case Darwin:
 		if utils.CommandExists("brew") {
 			add("brew", utils.FilePathGlobLens("/usr/local/Cellar/*/"))

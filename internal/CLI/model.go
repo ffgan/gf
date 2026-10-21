@@ -69,7 +69,7 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 	case Iphone:
 		model = iphoneName(kernelMachine)
 
-	case BSD, MINIX:
+	case BSD, MINIX, FreeBSD, OpenBSD, NetBSD, DragonFly, Bitrig:
 		if kernelName == "FreeBSD" {
 			model = utils.RunCommand("kenv", "smbios.system.version")
 		} else {
@@ -107,6 +107,14 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 		model = utils.RunCommand("/dev/fs/C/Windows/System32/wbem/WMIC.exe", "computersystem", "get", "manufacturer,model")
 		model = strings.ReplaceAll(model, "Manufacturer", "")
 		model = strings.ReplaceAll(model, "Model", "")
+	default:
+		if isBSDFamily(osName) {
+			if kernelName == FreeBSD || osName == FreeBSD {
+				model = utils.RunCommand("kenv", "smbios.system.version")
+			} else {
+				model = utils.RunCommand("sysctl", "-n", "hw.vendor", "hw.product")
+			}
+		}
 	}
 
 	model = cleanModelName(model)

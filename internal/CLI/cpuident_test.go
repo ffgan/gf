@@ -96,7 +96,13 @@ func TestGetOSDoesNotAbort(t *testing.T) {
 	if got := GetOS("Darwin", ""); got != "Darwin" {
 		t.Fatalf("darwin: %q", got)
 	}
-	if got := GetOS("FreeBSD", ""); got != "BSD" {
+	if got := GetOS("FreeBSD", ""); got != "FreeBSD" {
 		t.Fatalf("freebsd: %q", got)
+	}
+	if got := GetOS("OpenBSD", ""); got != "OpenBSD" {
+		t.Fatalf("openbsd: %q", got)
+	}
+	if got := GetOS("HP-UX", ""); got != "HP-UX" {
+		t.Fatalf("hpux: %q", got)
 	}
 }
