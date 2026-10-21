@@ -54,6 +54,10 @@ func Run(ASCIIFiles embed.FS) {
 	old_functions()
 
 	ctx := NewContext(h)
+	// fastfetch runs every module at once, then prints in order.
+	// Detection is independent; printing still has to be serial because
+	// each line positions the cursor.
+	ctx.prefetch(config.InfoList)
 
 	for _, line := range config.InfoList {
 		var prefix, func_name string

@@ -3,19 +3,30 @@ package gui
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
 	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetWM(osName, kernelName string) string {
-	if wmRun {
-		return wm
-	}
+// x11WMs are process names fastfetch/neofetch recognise. Matching comm
+// from /proc skips the xprop round trip on the common desktops.
+var x11WMs = []string{
+	"sowm", "catwm", "fvwm", "dwm", "2bwm", "monsterwm", "tinywm", "x11fs", "xmonad",
+	"awesome", "bspwm", "compiz", "cwm", "enlightenment", "fluxbox", "herbstluftwm",
+	"i3", "icewm", "jwm", "kwin", "kwin_x11", "leftwm", "marco", "metacity", "muffin",
+	"mutter", "openbox", "pekwm", "qtile", "spectrwm", "stumpwm", "xfwm4",
+}
 
-	// kernelName := getKernelName()
-	// osName := cli.GetOS()
+func GetWM(osName, kernelName string) string {
+	wmOnce.Do(func() {
+		wm = detectWM(osName, kernelName)
+	})
+	return wm
+}
+
+func detectWM(osName, kernelName string) string {
 	xdgRuntime := os.Getenv("XDG_RUNTIME_DIR")
 	waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
 	if waylandDisplay == "" {
@@ -34,7 +45,13 @@ func GetWM(osName, kernelName string) string {
 	if xdgRuntime != "" {
 		socket := filepath.Join(xdgRuntime, waylandDisplay)
 		if fi, err := os.Stat(socket); err == nil && fi.Mode()&os.ModeSocket != 0 {
-			tmpPid := tryLsofOrFuser(socket)
+			tmpPid := ""
+			if peer := waylandPeerPID(socket); peer > 0 {
+				tmpPid = strconv.Itoa(peer)
+			}
+			if tmpPid == "" {
+				tmpPid = tryLsofOrFuser(socket)
+			}
 			if tmpPid != "" {
 				wm = utils.GetProcessName(tmpPid)
 			} else {
@@ -53,9 +70,7 @@ func GetWM(osName, kernelName string) string {
 
 	// --- X11 detection ---
 	if wm == "" && display != "" && osName != cli.MacOSX && osName != cli.MacOS && osName != cli.FreeMiNT {
-		wm = utils.ScanProcesses(psFlags, []string{
-			"sowm", "catwm", "fvwm", "dwm", "2bwm", "monsterwm", "tinywm", "x11fs", "xmonad",
-		})
+		wm = utils.ScanProcesses(psFlags, x11WMs)
 		if wm == "" && utils.CommandExists("xprop") {
 			id := getRootWindowID()
 			if id != "" {
@@ -124,11 +139,16 @@ func GetWM(osName, kernelName string) string {
 	if strings.Contains(wm, "WINDOWMAKER") {
 		wm = "wmaker"
 	}
-	if strings.Contains(wm, "GNOME") && strings.Contains(wm, "Shell") {
+	if (strings.Contains(wm, "GNOME") && strings.Contains(wm, "Shell")) || wm == "gnome-shell" {
 		wm = "Mutter"
 	}
+	switch wm {
+	case "xfwm4":
+		wm = "Xfwm4"
+	case "kwin", "kwin_x11", "kwin_wayland":
+		wm = "KWin"
+	}
 
-	wmRun = true
 	return wm
 }
 
@@ -158,11 +178,17 @@ func getRootWindowID() string {
 }
 
 func getWMNameFromXProp(id string) string {
-	out := utils.RunCommand("xprop", "-id", id, "-notype", "-len", "100", "-f", "_NET_WM_NAME", "8t")
-	if idx := strings.Index(out, "WM_NAME = "); idx != -1 {
-		val := out[idx+len("WM_NAME = "):]
-		val = strings.Trim(val, "\" \n")
-		return val
+	// Ask for the one property. Dumping every property and searching for
+	// "WM_NAME" also matches the raw WM_NAME value and the _NET_ prefix.
+	out := utils.RunCommand("xprop", "-id", id, "-notype", "_NET_WM_NAME")
+	i := strings.Index(out, "\"")
+	if i < 0 {
+		return ""
 	}
-	return ""
+	rest := out[i+1:]
+	j := strings.Index(rest, "\"")
+	if j < 0 {
+		return strings.TrimSpace(rest)
+	}
+	return rest[:j]
 }

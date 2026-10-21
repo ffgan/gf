@@ -5,47 +5,63 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	cli "github.com/ffgan/gf/internal/CLI"
 	"github.com/ffgan/gf/internal/utils"
 )
 
 var (
-	deRun     bool
+	deOnce    sync.Once
 	de        string
 	deVersion string
-	wmRun     bool
+	wmOnce    sync.Once
 	wm        string
+
+	desktopOnce   sync.Once
+	desktopCached string
 )
 
 func detectDesktopEnvironment() string {
-	// 优先使用 XDG_CURRENT_DESKTOP
-	if de := os.Getenv("XDG_CURRENT_DESKTOP"); de != "" {
-		return de
-	}
-	// Fallback: 检查进程名
-	out := utils.RunCommand("ps", "-e")
-	switch {
-	case strings.Contains(out, "plasmashell"):
-		return "KDE"
-	case strings.Contains(out, "gnome-shell"):
-		return "Gnome"
-	case strings.Contains(out, "cinnamon"):
-		return "Cinnamon"
-	case strings.Contains(out, "xfce"):
-		return "Xfce"
-	case strings.Contains(out, "lxqt"):
-		return "LXQt"
-	}
-	return "Unknown"
+	desktopOnce.Do(func() {
+		if current := os.Getenv("XDG_CURRENT_DESKTOP"); current != "" {
+			desktopCached = current
+			return
+		}
+		// One /proc walk instead of `ps -e`. Theme, icons, font and cursor
+		// all ask for this, and each used to list every process.
+		var blob string
+		if names, ok := utils.ProcessNames(); ok {
+			blob = strings.Join(names, "\n")
+		} else {
+			blob = utils.RunCommand("ps", "-e")
+		}
+		switch {
+		case strings.Contains(blob, "plasmashell"):
+			desktopCached = "KDE"
+		case strings.Contains(blob, "gnome-shell"):
+			desktopCached = "Gnome"
+		case strings.Contains(blob, "cinnamon"):
+			desktopCached = "Cinnamon"
+		case strings.Contains(blob, "xfce"):
+			desktopCached = "Xfce"
+		case strings.Contains(blob, "lxqt"):
+			desktopCached = "LXQt"
+		default:
+			desktopCached = "Unknown"
+		}
+	})
+	return desktopCached
 }
 
 func GetDE(osName, distro, kernel_name string) string {
-	if deRun {
-		return de
-	}
-	deRun = true
+	deOnce.Do(func() {
+		de = detectDE(osName, distro, kernel_name)
+	})
+	return de
+}
 
+func detectDE(osName, distro, kernel_name string) string {
 	switch osName {
 	case cli.MacOSX, cli.MacOS:
 		de = "Aqua"
@@ -83,10 +99,6 @@ func GetDE(osName, distro, kernel_name string) string {
 		}
 
 	default:
-		if !wmRun {
-			GetWM(osName, kernel_name)
-		}
-
 		desktopSession := os.Getenv("DESKTOP_SESSION")
 		xdgCurrent := os.Getenv("XDG_CURRENT_DESKTOP")
 
@@ -119,8 +131,8 @@ func GetDE(osName, distro, kernel_name string) string {
 		}
 
 		// Remove DE if it's the same as WM
-		wm := GetWM(osName, kernel_name)
-		if de == wm {
+		wmName := GetWM(osName, kernel_name)
+		if de == wmName {
 			de = ""
 			return de
 		}

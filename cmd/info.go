@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
@@ -139,12 +140,11 @@ func (h *hardware) Get_wm_theme() {
 }
 
 func (h *hardware) Get_cpu() {
-	if h.CPUTemp == utils.OFF {
-		h.cpu = cli.GetCPU(h.os, h.KernelMachine, h.CPUCores, h.CPUSpeed, h.CPUTemp, h.CPUBrand, h.SpeedType, h.SpeedShorthand, h.CPUTemp)
-	}
 	if h.CPUTemp == utils.ON {
 		h.CPUTemp = "C"
 	}
+	// One read of /proc/cpuinfo. The previous form called GetCPU twice
+	// and kept only the second result.
 	h.cpu = cli.GetCPU(h.os, h.KernelMachine, h.CPUCores, h.CPUSpeed, utils.ON, h.CPUBrand, h.SpeedType, h.SpeedShorthand, h.CPUTemp)
 }
 
@@ -244,6 +244,9 @@ func (h *hardware) Get_gpu_driver() {
 }
 
 func (h *hardware) Get_cols() {
+	// Color blocks adjust for the VS Code terminal, which GetTerm records.
+	// Calling it here waits for that result when both run together.
+	_ = cli.GetTerm(h.os)
 	h.cols = cli.Getcols(h.leftMax)
 }
 
@@ -390,6 +393,45 @@ type Context struct {
 	values map[string]string
 }
 
+func lineFunc(line []string) (prefix, name string) {
+	if len(line) == 1 {
+		return "", line[0]
+	}
+	if len(line) >= 2 {
+		return line[0], line[1]
+	}
+	return "", ""
+}
+
+// prefetch detects every info line concurrently. fastfetch's default is
+// the same shape: modules do not wait on each other, and the slow ones
+// (packages, theme, window manager) overlap.
+func (c *Context) prefetch(lines [][]string) {
+	seen := make(map[string]struct{}, len(lines))
+	var wg sync.WaitGroup
+	for _, line := range lines {
+		_, name := lineFunc(line)
+		if name == "" {
+			continue
+		}
+		// Distro is already filled in before prefetch. Detecting it again
+		// writes fields the kernel and DE modules are reading.
+		if name == "distro" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			c.callMethod("Get_" + name)
+		}(name)
+	}
+	wg.Wait()
+}
+
 func (c *Context) info(arg1, arg2 string) {
 	if arg2 != "" {
 		subtitle = arg1
@@ -397,21 +439,8 @@ func (c *Context) info(arg1, arg2 string) {
 
 	prin = false
 
-	var funcName string
-	if arg2 != "" {
-		funcName = arg2
-	} else {
-		funcName = arg1
-	}
-
-	methodName := "Get_" + funcName
-
-	c.callMethod(methodName)
-
-	// If the Get_func function called 'prin' directly, stop here
-	if prin {
-		return
-	}
+	// Detection already ran in prefetch. Nothing in Get_* sets prin,
+	// so the print path is the only one left.
 
 	output := c.getField(arg2)
 	fmt.Printf("\033[%dC", c.target.leftMax)
@@ -499,9 +528,10 @@ func trim(s string) string {
 }
 
 // stripSequences removes ANSI escape sequences
+var ansiSeq = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
 func stripSequences(s string) string {
-	re := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-	return re.ReplaceAllString(s, "")
+	return ansiSeq.ReplaceAllString(s, "")
 }
 
 func (c *Context) getField(name string) string {

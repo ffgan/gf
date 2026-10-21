@@ -4,22 +4,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ffgan/gf/internal/utils"
 )
 
 var (
-	termRun bool
-	term    string
+	termOnce sync.Once
+	term     string
 )
 
 // GetTerm 负责检测当前终端类型
 func GetTerm(osname string) string {
-	if termRun {
-		return term
-	}
-	defer func() { termRun = true }()
+	termOnce.Do(func() {
+		detectTerm(osname)
+	})
+	return term
+}
+
+func detectTerm(osname string) {
 
 	termProgram := os.Getenv("TERM_PROGRAM")
 	termEnv := os.Getenv("TERM")
@@ -52,7 +57,7 @@ func GetTerm(osname string) string {
 	if term == "" {
 		parent := os.Getppid()
 		for term == "" && parent > 1 {
-			name := utils.GetProcessName(string(parent))
+			name := utils.GetProcessName(strconv.Itoa(parent))
 			switch {
 			case strings.Contains(name, "gnome-terminal-"):
 				term = "gnome-terminal"
@@ -65,7 +70,7 @@ func GetTerm(osname string) string {
 			case strings.Contains(name, "NeoVimServer"):
 				term = "VimR Terminal"
 			case name == "tmux" || strings.Contains(name, "systemd") || strings.Contains(name, "sshd"):
-				return term
+				return
 			default:
 				if osname == "Linux" {
 					if real, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", parent)); err == nil {
@@ -91,6 +96,4 @@ func GetTerm(osname string) string {
 	if os.Getenv("TERMUX_VERSION") != "" && (term == "" || term == "com.termux") {
 		term = "Termux " + os.Getenv("TERMUX_VERSION")
 	}
-
-	return term
 }
