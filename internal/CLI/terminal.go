@@ -6,21 +6,25 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ffgan/gf/internal/utils"
 )
 
 var (
-	termRun bool
-	term    string
+	termOnce sync.Once
+	term     string
 )
 
 // GetTerm 负责检测当前终端类型
 func GetTerm(osname string) string {
-	if termRun {
-		return term
-	}
-	defer func() { termRun = true }()
+	termOnce.Do(func() {
+		detectTerm(osname)
+	})
+	return term
+}
+
+func detectTerm(osname string) {
 
 	termProgram := os.Getenv("TERM_PROGRAM")
 	termEnv := os.Getenv("TERM")
@@ -63,6 +67,8 @@ func GetTerm(osname string) string {
 				term = "urxvt"
 			case strings.Contains(name, "nvim"):
 				term = "Neovim Terminal"
+			case strings.Contains(name, "NeoVimServer"):
+				term = "VimR Terminal"
 			case knownTerminal(name):
 				term = name
 			}
@@ -88,8 +94,6 @@ func GetTerm(osname string) string {
 	if os.Getenv("TERMUX_VERSION") != "" && (term == "" || term == "com.termux") {
 		term = "Termux " + os.Getenv("TERMUX_VERSION")
 	}
-
-	return term
 }
 
 func processBase(pid int, osname string) string {

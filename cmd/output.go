@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ffgan/gf/internal/info"
 	"github.com/ffgan/gf/internal/logo"
@@ -17,6 +18,7 @@ func (h *hardware) plainMode() bool {
 }
 
 func (h *hardware) Rows() []string {
+	h.prefetch()
 	var rows []string
 	for _, line := range h.InfoList {
 		if h.skipped(line) {
@@ -30,7 +32,6 @@ func (h *hardware) Rows() []string {
 				continue
 			}
 		}
-		h.invoke(key)
 		if key == "cols" {
 			for _, block := range strings.Split(h.cols, "\n") {
 				if block != "" {
@@ -83,6 +84,43 @@ func splitInfo(line []string) (label, key string) {
 	default:
 		return line[0], line[len(line)-1]
 	}
+}
+
+// prefetch detects every info line concurrently. fastfetch's modules do
+// not wait on each other, and the slow ones overlap. A second wave waits
+// for values the first wave writes.
+func (h *hardware) prefetch() {
+	seen := map[string]bool{}
+	var first, second []string
+	for _, line := range h.InfoList {
+		if h.skipped(line) {
+			continue
+		}
+		_, key := splitInfo(line)
+		if key == "" || key == "line_break" || key == "blank" || key == "distro" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		switch key {
+		case "wm_theme", "term_font", "underline":
+			second = append(second, key)
+		default:
+			first = append(first, key)
+		}
+	}
+	run := func(keys []string) {
+		var wg sync.WaitGroup
+		for _, key := range keys {
+			wg.Add(1)
+			go func(key string) {
+				defer wg.Done()
+				h.invoke(key)
+			}(key)
+		}
+		wg.Wait()
+	}
+	run(first)
+	run(second)
 }
 
 func (h *hardware) invoke(key string) {

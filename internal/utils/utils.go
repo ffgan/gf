@@ -57,6 +57,9 @@ func PathExists(path string) bool {
 }
 
 func GetParentPID(pid int) int {
+	if p, ok := parentPIDFast(pid); ok {
+		return p
+	}
 	out, err := CommandOutput("ps", "-o", "ppid=", "-p", fmt.Sprint(pid))
 	if err != nil {
 		return 0
@@ -71,6 +74,9 @@ func GetParentPID(pid int) int {
 }
 
 func GetProcessName(pid string) string {
+	if name, ok := processNameFast(pid); ok {
+		return name
+	}
 	out, err := CommandOutput("ps", "-p", pid, "-o", "comm=")
 	if err != nil {
 		return ""
@@ -78,7 +84,30 @@ func GetProcessName(pid string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// ProcessNames returns the comm of every process. On Linux this is one
+// pass over /proc, shared by every module that used to spawn `ps`.
+func ProcessNames() ([]string, bool) {
+	return processNamesFast()
+}
+
 func ScanProcesses(psFlags []string, names []string) string {
+	if comms, ok := processNamesFast(); ok {
+		running := make(map[string]struct{}, len(comms))
+		for _, c := range comms {
+			running[c] = struct{}{}
+		}
+		for _, n := range names {
+			if _, found := running[n]; found {
+				return n
+			}
+			if len(n) > 15 {
+				if _, found := running[n[:15]]; found {
+					return n
+				}
+			}
+		}
+		return ""
+	}
 	out := RunCommand("ps", "-e", "-o", "comm=")
 	if strings.TrimSpace(out) == "" && len(psFlags) > 0 {
 		out = RunCommand("ps", psFlags...)

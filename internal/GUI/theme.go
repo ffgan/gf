@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"encoding/xml"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -125,8 +126,9 @@ func readQt5ctTheme(key string) string {
 }
 
 var (
-	gsettingsOnce sync.Once
-	gsettingsOK   bool
+	gsettingsOnce  sync.Once
+	gsettingsOK    bool
+	gsettingsCache sync.Map
 )
 
 func getGSettings(schema, key string) string {
@@ -136,15 +138,96 @@ func getGSettings(schema, key string) string {
 	if !gsettingsOK {
 		return ""
 	}
+	cacheKey := schema + "\x00" + key
+	if v, ok := gsettingsCache.Load(cacheKey); ok {
+		return v.(string)
+	}
 	out := utils.RunCommand("gsettings", "get", schema, key)
-	return strings.Trim(strings.TrimSpace(out), "'\"")
+	out = strings.Trim(strings.TrimSpace(out), "'\"")
+	gsettingsCache.Store(cacheKey, out)
+	return out
 }
 
+type xfProperty struct {
+	Name  string       `xml:"name,attr"`
+	Value string       `xml:"value,attr"`
+	Props []xfProperty `xml:"property"`
+}
+
+type xfChannel struct {
+	Props []xfProperty `xml:"property"`
+}
+
+var (
+	xsettingsOnce sync.Once
+	xsettings     *xfChannel
+	xsettingsOK   bool
+)
+
+func loadXsettings() *xfChannel {
+	xsettingsOnce.Do(func() {
+		base := os.Getenv("XDG_CONFIG_HOME")
+		if base == "" {
+			base = filepath.Join(os.Getenv("HOME"), ".config")
+		}
+		path := filepath.Join(base, "xfce4", "xfconf", "xfce-perchannel-xml", "xsettings.xml")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return
+		}
+		var ch xfChannel
+		if xml.Unmarshal(data, &ch) != nil {
+			return
+		}
+		xsettings = &ch
+		xsettingsOK = true
+	})
+	if !xsettingsOK {
+		return nil
+	}
+	return xsettings
+}
+
+func lookupXf(props []xfProperty, path []string) (string, bool) {
+	if len(path) == 0 {
+		return "", false
+	}
+	for _, p := range props {
+		if p.Name != path[0] {
+			continue
+		}
+		if len(path) == 1 {
+			return p.Value, true
+		}
+		return lookupXf(p.Props, path[1:])
+	}
+	return "", false
+}
+
+// readXfconf reads xfce's xsettings channel from disk. xfconf-query talks
+// to xfconfd over dbus; the xml file is the same data already on disk.
+func readXfconf(prop string) string {
+	if ch := loadXsettings(); ch != nil {
+		parts := strings.Split(strings.Trim(prop, "/"), "/")
+		if value, ok := lookupXf(ch.Props, parts); ok && value != "" {
+			return value
+		}
+	}
+	if prop == "" {
+		return ""
+	}
+	return utils.RunCommand("xfconf-query", "-c", "xsettings", "-p", prop)
+}
+
+// themeOrder keeps GTK/Qt fragments stable. Map iteration order changes
+// every process, so the same theme used to print in a different order
+// on every run.
+var themeOrder = []string{"GTK2", "GTK3", "Qt", "KDE"}
+
 func buildThemeString(parts map[string]string) string {
-	order := []string{"GTK2", "GTK3", "Qt", "KDE"}
 	seen := map[string]bool{}
 	var chunks []string
-	for _, key := range order {
+	for _, key := range themeOrder {
 		value := strings.Trim(strings.TrimSpace(parts[key]), `"'`)
 		if value == "" || seen[value] {
 			continue

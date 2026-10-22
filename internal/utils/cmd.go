@@ -5,6 +5,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -36,8 +37,24 @@ func RunCommandCount(name string, args ...string) int {
 	return lines + 1
 }
 
+type lookResult struct {
+	path string
+	err  error
+}
+
+// lookCache remembers PATH lookups for this process. A fetch run asks
+// about the same tools from several modules; exec.LookPath walks PATH
+// every time otherwise.
+var lookCache sync.Map
+
 func LookPath(file string) (string, error) {
-	return exec.LookPath(file)
+	if v, ok := lookCache.Load(file); ok {
+		r := v.(lookResult)
+		return r.path, r.err
+	}
+	p, err := exec.LookPath(file)
+	lookCache.Store(file, lookResult{path: p, err: err})
+	return p, err
 }
 
 func CommandExists(cmd string) bool {
