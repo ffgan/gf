@@ -31,7 +31,7 @@ go build -o gf .
 ```bash
 # android/386、android/amd64、android/arm 需要 ANDROID_NDK_HOME。
 # ios/arm64 只能在装了 Xcode 的 macOS 上编。
-VERSION=0.2.0 ANDROID_NDK_HOME=/opt/android-ndk bash scripts/build-release.sh
+VERSION=0.3.0 ANDROID_NDK_HOME=/opt/android-ndk bash scripts/build-release.sh
 ```
 
 ## 用法
