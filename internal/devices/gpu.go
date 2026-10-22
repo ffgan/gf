@@ -310,12 +310,58 @@ func parseSystemProfiler(data, key string) string {
 }
 
 func getWindowsGPU() string {
+	// reg.exe /s prints every binary value under the display class. On a
+	// machine with virtual adapters that dump is large enough to dominate
+	// startup. The registry API reads DriverDesc and the memory size only.
+	if items, ok := windowsRegistryGPUs(); ok {
+		return formatWindowsGPUItems(items)
+	}
 	out := utils.RunCommand("reg.exe", "query", `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`, "/s")
 	return formatWindowsGPUs(out)
 }
 
+func windowsRegistryGPUs() ([]windowsGPU, bool) {
+	const class = `SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`
+	subs, ok := utils.RegSubkeys(utils.HKLM, class)
+	if !ok {
+		return nil, false
+	}
+	var items []windowsGPU
+	for _, sub := range subs {
+		if !digitsOnly(sub) {
+			continue
+		}
+		path := class + `\` + sub
+		name, ok := utils.RegString(utils.HKLM, path, "DriverDesc")
+		if !ok || name == "" {
+			continue
+		}
+		mem, _ := utils.RegUint64(utils.HKLM, path, "HardwareInformation.qwMemorySize")
+		if mem == 0 {
+			mem, _ = utils.RegUint64(utils.HKLM, path, "HardwareInformation.MemorySize")
+		}
+		items = append(items, windowsGPU{name: name, mem: mem})
+	}
+	return items, true
+}
+
+func digitsOnly(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func formatWindowsGPUs(out string) string {
-	items := parseWindowsGPUs(out)
+	return formatWindowsGPUItems(parseWindowsGPUs(out))
+}
+
+func formatWindowsGPUItems(items []windowsGPU) string {
 	names := make([]string, 0, len(items))
 	for _, item := range items {
 		names = append(names, item.name)

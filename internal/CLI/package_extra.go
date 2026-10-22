@@ -227,14 +227,26 @@ func countCargoInstalls() (int, bool) {
 // countInstalledPrograms counts uninstall-registry keys. `winget list`
 // contacts the network and is the multi-second stall on Windows.
 func countInstalledPrograms() int {
-	keys := []string{
-		`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`,
-		`HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall`,
-		`HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`,
+	keys := []struct {
+		root uintptr
+		path string
+	}{
+		{utils.HKLM, `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`},
+		{utils.HKLM, `SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall`},
+		{utils.HKCU, `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`},
 	}
 	n := 0
 	for _, key := range keys {
-		n += countRegSubkeys(utils.RunCommand("reg.exe", "query", key))
+		subs, ok := utils.RegSubkeys(key.root, key.path)
+		if ok {
+			n += len(subs)
+			continue
+		}
+		hive := `HKLM`
+		if key.root == utils.HKCU {
+			hive = `HKCU`
+		}
+		n += countRegSubkeys(utils.RunCommand("reg.exe", "query", hive+`\`+key.path))
 	}
 	return n
 }
