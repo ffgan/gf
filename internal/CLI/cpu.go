@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math/bits"
 	"os"
 	"strings"
+	"unsafe"
 
 	"strconv"
 
@@ -79,6 +82,8 @@ type CPUInfo struct {
 	OS           string
 	Machine      string
 	CountsInName bool
+	// CoreLabel is a hybrid layout such as "8+16". It replaces the single count.
+	CoreLabel string
 }
 
 type CPUConfig struct {
@@ -109,6 +114,8 @@ func GetCPUInfo(OS, Machine string, config CPUConfig) (*CPUInfo, error) {
 	switch OS {
 	case Linux:
 		return getCPULinux(info, config)
+	case Windows:
+		return getCPUWindows(info)
 	case Darwin:
 		return getCPUDarwin(info, config)
 	case FreeBSD, OpenBSD, NetBSD, DragonFly, BSD, Bitrig:
@@ -339,10 +346,67 @@ func getCPUSolaris(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 	return info, nil
 }
 
+func getCPUWindows(info *CPUInfo) (*CPUInfo, error) {
+	proc := utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0`)
+	info.Name = regValue(proc, "ProcessorNameString")
+	if info.Name == "" {
+		return nil, fmt.Errorf("cpu name not in the registry")
+	}
+	if mhz, err := strconv.Atoi(regNumber(regValue(proc, "~MHz"))); err == nil {
+		info.Speed = mhz
+	}
+	list := utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor`)
+	info.Cores = countRegSubkeys(list)
+	info.CoreLabel = windowsCoreLabel()
+	return info, nil
+}
+
 func FormatCPUInfo(info *CPUInfo, config CPUConfig) string {
 	cpu := info.Name
 
-	// Clean up CPU name
+	// Windows keeps the vendor marks fastfetch prints. Other systems follow
+	// the shorter neofetch cleanup.
+	if info.OS == Windows {
+		cpu = strings.Join(strings.Fields(cpu), " ")
+	} else {
+		cpu = cleanCPUName(cpu)
+	}
+
+	// Remove brand if disabled
+	if !config.ShowBrand {
+		cpu = strings.TrimPrefix(cpu, "AMD ")
+		cpu = strings.TrimPrefix(cpu, "Intel ")
+		cpu = strings.TrimPrefix(cpu, "Qualcomm ")
+	}
+
+	// Add cores. A big.LITTLE name already lists each cluster.
+	if config.ShowCores && !info.CountsInName {
+		switch {
+		case info.CoreLabel != "":
+			cpu = fmt.Sprintf("%s (%s)", cpu, info.CoreLabel)
+		case info.Cores > 0:
+			cpu = fmt.Sprintf("%s (%d)", cpu, info.Cores)
+		}
+	}
+
+	// Add speed
+	if config.ShowSpeed && info.Speed > 0 {
+		cpu = fmt.Sprintf("%s @ %s", cpu, formatCPUSpeed(info, config.SpeedShort))
+	}
+
+	// Add temperature
+	if config.ShowTemp && info.Temperature > 0 {
+		temp := info.Temperature
+		if config.TempUnit == "F" {
+			temp = temp*9.0/5.0 + 32.0
+		}
+		cpu = fmt.Sprintf("%s [%.1f°%s]", cpu, temp, config.TempUnit)
+	}
+
+	return cpu
+}
+
+func cleanCPUName(cpu string) string {
 	replacements := map[string]string{
 		"(TM)":              "",
 		"(tm)":              "",
@@ -363,37 +427,14 @@ func FormatCPUInfo(info *CPUInfo, config CPUConfig) string {
 	for old, new := range replacements {
 		cpu = strings.ReplaceAll(cpu, old, new)
 	}
+	return strings.Join(strings.Fields(cpu), " ")
+}
 
-	// Remove extra spaces
-	cpu = strings.Join(strings.Fields(cpu), " ")
-
-	// Remove brand if disabled
-	if !config.ShowBrand {
-		cpu = strings.TrimPrefix(cpu, "AMD ")
-		cpu = strings.TrimPrefix(cpu, "Intel ")
-		cpu = strings.TrimPrefix(cpu, "Qualcomm ")
+func formatCPUSpeed(info *CPUInfo, shorthand bool) string {
+	if info.OS == Windows && info.Speed >= 1000 {
+		return fmt.Sprintf("%.2f GHz", float64(info.Speed)/1000)
 	}
-
-	// Add cores. A big.LITTLE name already lists each cluster.
-	if config.ShowCores && info.Cores > 0 && !info.CountsInName {
-		cpu = fmt.Sprintf("%s (%d)", cpu, info.Cores)
-	}
-
-	// Add speed
-	if config.ShowSpeed && info.Speed > 0 {
-		cpu = fmt.Sprintf("%s @ %s", cpu, formatSpeed(info.Speed, config.SpeedShort))
-	}
-
-	// Add temperature
-	if config.ShowTemp && info.Temperature > 0 {
-		temp := info.Temperature
-		if config.TempUnit == "F" {
-			temp = temp*9.0/5.0 + 32.0
-		}
-		cpu = fmt.Sprintf("%s [%.1f°%s]", cpu, temp, config.TempUnit)
-	}
-
-	return cpu
+	return formatSpeed(info.Speed, shorthand)
 }
 
 func formatSpeed(mhz int, shorthand bool) string {
@@ -405,4 +446,64 @@ func formatSpeed(mhz int, shorthand bool) string {
 		return fmt.Sprintf("%.1fGHz", ghz)
 	}
 	return fmt.Sprintf("%.3fGHz", ghz)
+}
+
+// coreLabelFromBuffer reads GetLogicalProcessorInformationEx output and
+// returns performance+efficiency counts, highest efficiency class first.
+// A single class returns an empty string so the plain core count is used.
+func coreLabelFromBuffer(buf []byte) string {
+	maskSize := int(unsafe.Sizeof(uintptr(0)))
+	stride := 16
+	if maskSize == 4 {
+		stride = 12
+	}
+	counts := map[byte]int{}
+	for off := 0; off+32 <= len(buf); {
+		rel := binary.LittleEndian.Uint32(buf[off:])
+		size := int(binary.LittleEndian.Uint32(buf[off+4:]))
+		if size < 32 || off+size > len(buf) {
+			break
+		}
+		if rel == 0 {
+			class := buf[off+9]
+			groups := int(binary.LittleEndian.Uint16(buf[off+30:]))
+			n := 0
+			for g := 0; g < groups; g++ {
+				start := off + 32 + g*stride
+				if start+maskSize > off+size || start+maskSize > len(buf) {
+					break
+				}
+				var mask uint64
+				if maskSize == 8 {
+					mask = binary.LittleEndian.Uint64(buf[start:])
+				} else {
+					mask = uint64(binary.LittleEndian.Uint32(buf[start:]))
+				}
+				n += bits.OnesCount64(mask)
+			}
+			if n > 0 {
+				counts[class] += n
+			}
+		}
+		off += size
+	}
+	if len(counts) < 2 {
+		return ""
+	}
+	classes := make([]byte, 0, len(counts))
+	for class := range counts {
+		classes = append(classes, class)
+	}
+	for i := 0; i < len(classes); i++ {
+		for j := i + 1; j < len(classes); j++ {
+			if classes[j] > classes[i] {
+				classes[i], classes[j] = classes[j], classes[i]
+			}
+		}
+	}
+	parts := make([]string, len(classes))
+	for i, class := range classes {
+		parts[i] = strconv.Itoa(counts[class])
+	}
+	return strings.Join(parts, "+")
 }

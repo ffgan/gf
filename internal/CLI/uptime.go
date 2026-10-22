@@ -17,6 +17,8 @@ func GetUptime(osName, uptimeShorthand string) string {
 	// Windows keep the uptime -s fallback when that file is missing.
 	if sec, ok := uptimeFromProc(); ok {
 		s = sec
+	} else if sec, ok := uptimeFromPlatform(); ok {
+		s = sec
 	} else {
 		s = uptimeFromCommand(osName)
 	}

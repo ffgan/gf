@@ -3,6 +3,7 @@ package gui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -10,6 +11,9 @@ import (
 
 // GetWMTheme returns the window manager's own theme, separate from the GTK theme.
 func GetWMTheme(wm string) string {
+	if runtime.GOOS == "windows" {
+		return windowsWMTheme()
+	}
 	low := strings.ToLower(wm)
 	switch {
 	case strings.Contains(low, "xfwm"):
@@ -46,6 +50,9 @@ func openboxTheme() string {
 
 // GetTermFont reads the font configured by the detected terminal emulator.
 func GetTermFont(term string) string {
+	if font := windowsTermFont(term); font != "" {
+		return font
+	}
 	low := strings.ToLower(term)
 	switch {
 	case strings.Contains(low, "xfce4-terminal"):

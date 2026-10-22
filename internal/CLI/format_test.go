@@ -24,6 +24,13 @@ func TestFormatCPUInfo(t *testing.T) {
 	if got != "Intel Xeon (4) @ 2.4GHz" {
 		t.Fatalf("cpu = %q", got)
 	}
+	win := FormatCPUInfo(&CPUInfo{
+		Name: "Intel(R) Core(TM) Ultra 7 270K Plus", OS: Windows,
+		Speed: 3690, CoreLabel: "8+16",
+	}, CPUConfig{ShowCores: true, ShowSpeed: true, ShowBrand: true, SpeedShort: true})
+	if win != "Intel(R) Core(TM) Ultra 7 270K Plus (8+16) @ 3.69 GHz" {
+		t.Fatalf("windows cpu = %q", win)
+	}
 }
 
 func TestHumanBytes(t *testing.T) {

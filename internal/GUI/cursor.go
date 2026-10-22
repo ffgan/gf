@@ -1,6 +1,11 @@
 package gui
 
+import "runtime"
+
 func GetCursor() string {
+	if runtime.GOOS == "windows" {
+		return windowsCursor()
+	}
 	ctx := StyleContext{
 		Name:      "gtk-cursor-theme-name",
 		GSettings: "cursor-theme",

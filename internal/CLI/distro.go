@@ -12,8 +12,13 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 	var asciiName string
 	var releaseName, releaseID, releaseLike string
 	hideArch := false
-	files := collectReleaseFiles()
-	enrichRelease(files)
+	var files map[string]string
+	// Windows already knows its release from the registry. Probing
+	// lsb_release, uname, and the Unix release files only adds processes.
+	if osName != Windows {
+		files = collectReleaseFiles()
+		enrichRelease(files)
+	}
 
 	switch osName {
 	case Linux, BSD, MINIX, Ironclad, FreeBSD, OpenBSD, NetBSD, DragonFly, Bitrig, "Fiwix", "QNX":
@@ -29,10 +34,8 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 		build := strings.TrimSpace(utils.RunCommand("sw_vers", "-buildVersion"))
 		distro, asciiName, hideArch = formatApple(product, version, build, distroShorthand)
 	case Windows:
-		psCmd := `Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object -ExpandProperty ProductName`
-		out := utils.RunCommand("powershell", "-Command", psCmd)
-		build := utils.RunCommand("powershell", "-Command", "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty CurrentBuildNumber")
-		distro = windowsProduct(out, build)
+		text := windowsCurrentVersion()
+		distro = windowsDistroName(text, windowsLongName())
 		asciiName = windowsArt(distro)
 	case Solaris, illumos:
 		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, files)

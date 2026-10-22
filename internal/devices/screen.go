@@ -21,7 +21,7 @@ func GetResolution(osName, machine string, refresh bool) string {
 	case cli.Iphone:
 		resolution = getResolutionIOS(machine)
 	case cli.Windows:
-		resolution = getResolutionWindows()
+		resolution = getResolutionWindows(refresh)
 	case cli.Haiku:
 		resolution = getResolutionHaiku()
 	default:
@@ -117,23 +117,6 @@ func getResolutionIOS(machine string) string {
 		return val
 	}
 	return ""
-}
-
-// --- Windows ---
-func getResolutionWindows() string {
-	out, err := utils.CommandOutput("wmic", "path", "Win32_VideoController", "get", "CurrentHorizontalResolution,CurrentVerticalResolution")
-	if err != nil {
-		return ""
-	}
-	lines := strings.Split(string(out), "\n")
-	var resolutions []string
-	for _, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) == 2 {
-			resolutions = append(resolutions, fmt.Sprintf("%sx%s", fields[0], fields[1]))
-		}
-	}
-	return strings.Join(resolutions, ", ")
 }
 
 // --- Haiku ---

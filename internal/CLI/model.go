@@ -77,9 +77,7 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 		}
 
 	case Windows:
-		model = utils.RunCommand("wmic", "computersystem", "get", "manufacturer,model")
-		model = strings.ReplaceAll(model, "Manufacturer", "")
-		model = strings.ReplaceAll(model, "Model", "")
+		model = windowsHardwareModel(utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\BIOS`))
 
 	case Solaris, illumos:
 		model = utils.RunCommand("prtconf", "-b")

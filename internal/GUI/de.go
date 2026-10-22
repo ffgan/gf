@@ -193,7 +193,7 @@ func GetDE(osName, distro, kernel_name, showVersion string) string {
 		}
 	}
 
-	if de != "" && !strings.Contains(de, "(") {
+	if osName != cli.Windows && de != "" && !strings.Contains(de, "(") {
 		switch {
 		case os.Getenv("WAYLAND_DISPLAY") != "":
 			de += " (Wayland)"

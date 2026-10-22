@@ -3,11 +3,15 @@ package dev
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-// GetBattery reads Linux power_supply batteries. Other systems return empty.
+// GetBattery reads the platform battery. A desktop with no battery returns empty.
 func GetBattery() string {
+	if runtime.GOOS == "windows" {
+		return getBatteryWindows()
+	}
 	matches, _ := filepath.Glob("/sys/class/power_supply/BAT*")
 	var parts []string
 	for _, dir := range matches {

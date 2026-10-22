@@ -56,6 +56,7 @@ type hardware struct {
 	npu string
 
 	memory string
+	swap   string
 
 	network string
 
@@ -84,6 +85,7 @@ type hardware struct {
 
 	term      string
 	term_font string
+	font      string
 
 	ascii_bold string
 	bold       string
@@ -189,6 +191,10 @@ func (h *hardware) Get_memory() {
 	h.memory = cli.PrintMem(h.os, h.Memory, h.ProgressBar)
 }
 
+func (h *hardware) Get_swap() {
+	h.swap = cli.PrintSwap(h.os, h.Memory.MemoryPercent == utils.ON)
+}
+
 func (h *hardware) Get_network() {
 	h.network = dev.GetNetwork(h.os)
 }
@@ -217,7 +223,7 @@ func (h *hardware) Get_icons() {
 }
 
 func (h *hardware) Get_font() {
-	h.term_font = gui.GetFont()
+	h.font = gui.GetFont()
 }
 
 func (h *hardware) Get_cursor() {

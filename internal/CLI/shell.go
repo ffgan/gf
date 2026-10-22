@@ -20,7 +20,7 @@ func GetShell(shellPath, shellVersion string) string {
 	case utils.ON:
 		shell = shellEnv + " "
 	case utils.OFF:
-		shell = filepath.Base(shellEnv) + " "
+		shell = trimExe(filepath.Base(shellEnv)) + " "
 	}
 
 	// If version output is disabled, return early
@@ -28,7 +28,7 @@ func GetShell(shellPath, shellVersion string) string {
 		return shell
 	}
 
-	shellName := filepath.Base(shellEnv)
+	shellName := trimExe(filepath.Base(shellEnv))
 
 	switch shellName {
 	case "sh", "ash", "dash", "es":
@@ -53,6 +53,13 @@ func GetShell(shellPath, shellVersion string) string {
 	}
 
 	return strings.TrimSpace(shell)
+}
+
+func trimExe(name string) string {
+	if len(name) > 4 && strings.EqualFold(name[len(name)-4:], ".exe") {
+		return name[:len(name)-4]
+	}
+	return name
 }
 
 func versionOfShell(shellPath, shellName string) string {

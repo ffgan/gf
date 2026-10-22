@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ffgan/gf/internal/utils"
 )
@@ -727,6 +729,118 @@ func enrichRelease(files map[string]string) {
 	}
 }
 
+var (
+	windowsRegOnce sync.Once
+	windowsRegText string
+)
+
+func windowsCurrentVersion() string {
+	windowsRegOnce.Do(func() {
+		windowsRegText = utils.RunCommand("reg.exe", "query", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion`)
+	})
+	return windowsRegText
+}
+
+func windowsDistroFromReg(text string) string {
+	return windowsDistroName(text, "")
+}
+
+func windowsReleaseCode(text string) string {
+	return firstNonEmpty(regValue(text, "DisplayVersion"), regValue(text, "CSDVersion"), regValue(text, "ReleaseId"))
+}
+
+// windowsDistroName builds the OS line. branded is the localized name from
+// winbrand when the machine has one; an empty string uses ProductName.
+func windowsDistroName(text, branded string) string {
+	build := regValue(text, "CurrentBuildNumber")
+	product := strings.TrimSpace(branded)
+	if product == "" {
+		product = regValue(text, "ProductName")
+	}
+	product = windowsProduct(product, build)
+	if code := windowsReleaseCode(text); code != "" && !strings.Contains(product, code) {
+		product += " (" + code + ")"
+	}
+	return strings.TrimSpace(product)
+}
+
+// WindowsDesktop is the Windows visual style: Fluent, Metro, or Aero.
+func WindowsDesktop() string {
+	build := regValue(windowsCurrentVersion(), "CurrentBuildNumber")
+	switch {
+	case build == "" || buildAtLeast(build, 10240):
+		return "Fluent"
+	case buildAtLeast(build, 9200):
+		return "Metro"
+	default:
+		return "Aero"
+	}
+}
+
+func windowsKernelVersion(text string) string {
+	build := regValue(text, "CurrentBuildNumber")
+	if build == "" {
+		return ""
+	}
+	major := regNumber(regValue(text, "CurrentMajorVersionNumber"))
+	minor := regNumber(regValue(text, "CurrentMinorVersionNumber"))
+	if major == "" || minor == "" {
+		parts := strings.Split(regValue(text, "CurrentVersion"), ".")
+		if major == "" && len(parts) > 0 {
+			major = parts[0]
+		}
+		if minor == "" && len(parts) > 1 {
+			minor = parts[1]
+		}
+	}
+	if major == "" {
+		major = "10"
+	}
+	if minor == "" {
+		minor = "0"
+	}
+	ver := major + "." + minor + "." + build
+	if ubr := regNumber(regValue(text, "UBR")); ubr != "" {
+		ver += "." + ubr
+	}
+	return ver
+}
+
+func windowsHardwareModel(text string) string {
+	vendor := strings.TrimSpace(regValue(text, "SystemManufacturer"))
+	product := strings.TrimSpace(regValue(text, "SystemProductName"))
+	switch {
+	case vendor != "" && product != "":
+		return vendor + " " + product
+	case product != "":
+		return product
+	default:
+		return vendor
+	}
+}
+
+func countRegSubkeys(out string) int {
+	n := 0
+	seen := map[string]bool{}
+	parent := ""
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "HKEY_") {
+			continue
+		}
+		if parent == "" {
+			parent = line
+			continue
+		}
+		if line == parent || seen[line] {
+			continue
+		}
+		seen[line] = true
+		n++
+	}
+	return n
+}
+
 func regValue(out, name string) string {
 	for _, line := range strings.Split(out, "\n") {
 		if !strings.Contains(line, name) || !strings.Contains(line, "REG_") {
@@ -740,4 +854,15 @@ func regValue(out, name string) string {
 		}
 	}
 	return ""
+}
+
+func regNumber(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(strings.ToLower(s), "0x") {
+		n, err := strconv.ParseUint(s[2:], 16, 64)
+		if err == nil {
+			return strconv.FormatUint(n, 10)
+		}
+	}
+	return s
 }
