@@ -29,8 +29,10 @@ func ClassifyKernel(kernelName string) (osName string, known bool) {
 		return Ironclad, true
 	case "osf1", "tru64", "digitalunix", "digital unix":
 		return digitalUNIX, true
-	case "linux":
+	case "linux", "harmonyos", "openharmony":
 		return Linux, true
+	case "fiwix":
+		return "Fiwix", true
 	case "ravynos":
 		return RavynOS, true
 	case "dragonfly", "dragonflybsd":

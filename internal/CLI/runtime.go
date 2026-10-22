@@ -174,7 +174,9 @@ func LogoKey(name, id string) string {
 		return "Ubuntu Kylin"
 	case "openeuler", "euleros":
 		return "openEuler"
-	case "harmonyos", "openharmony", "hyperos":
+	case "harmonyos", "openharmony":
+		return "HarmonyOS"
+	case "hyperos":
 		return "Android"
 	case "anolis", "opencloudos":
 		return "CentOS"
@@ -192,7 +194,9 @@ func LogoKey(name, id string) string {
 		return "Raspbian"
 	case strings.Contains(lowName, "rocky linux"):
 		return "rocky"
-	case strings.Contains(lowName, "openharmony"), strings.Contains(lowName, "harmonyos"), strings.Contains(lowName, "hyperos"):
+	case strings.Contains(lowName, "openharmony"), strings.Contains(lowName, "harmonyos"):
+		return "HarmonyOS"
+	case strings.Contains(lowName, "hyperos"):
 		return "Android"
 	case strings.Contains(lowName, "openkylin"):
 		return "openKylin"

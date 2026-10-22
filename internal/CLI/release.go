@@ -3,9 +3,20 @@ package cli
 import "strings"
 
 // FormatDistro names a distribution from the release files a system actually
-// has. os-release wins. Older and embedded systems fall through to the single
-// file they do ship, and the result is the OS name when nothing else exists.
+// has. Neofetch's historical probes (Bedrock, Red Star, Armbian, Astra, and
+// the other pre-os-release files) win when they are present. Otherwise
+// os-release wins, and older systems fall through to the single file they
+// ship. The result is the OS name when nothing else exists.
 func FormatDistro(osName, shorthand string, files map[string]string) (display, ascii, name, id, idLike string) {
+	display, ascii, name, id, idLike = formatRelease(osName, shorthand, files)
+	display, ascii = finishDistro(display, ascii, name, shorthand, files)
+	return
+}
+
+func formatRelease(osName, shorthand string, files map[string]string) (display, ascii, name, id, idLike string) {
+	if d, a, n, i, l, ok := earlyDistro(shorthand, files); ok {
+		return d, a, n, i, l
+	}
 	if text := files["os-release"]; text != "" {
 		info := parseOSReleaseText(text)
 		name = info["NAME"]
@@ -19,9 +30,13 @@ func FormatDistro(osName, shorthand string, files map[string]string) (display, a
 			version = info["VERSION_ID"]
 		}
 		pretty := info["PRETTY_NAME"]
+		code := info["UBUNTU_CODENAME"]
 		switch shorthand {
 		case "tiny":
 			display = name
+			if display == "" {
+				display = info["TAILS_PRODUCT_NAME"]
+			}
 		case "on":
 			display = strings.TrimSpace(name + " " + version)
 		default:
@@ -29,6 +44,9 @@ func FormatDistro(osName, shorthand string, files map[string]string) (display, a
 				display = pretty
 			} else {
 				display = strings.TrimSpace(name + " " + version)
+			}
+			if code != "" && !strings.Contains(strings.ToLower(display), strings.ToLower(code)) && strings.Contains(strings.ToLower(name+" "+info["ID"]), "ubuntu") {
+				display = strings.TrimSpace(display + " " + code)
 			}
 		}
 		ascii = distroArtName(name, id, idLike, pretty)
@@ -149,7 +167,7 @@ func FormatDistro(osName, shorthand string, files map[string]string) (display, a
 		}
 		line := strings.TrimSpace(strings.Split(text, "\n")[0])
 		art := solarisArt(line, name)
-		return line, art, name, strings.ToLower(name), ""
+		return solarisDisplay(line, shorthand), art, name, strings.ToLower(name), ""
 	}
 	if text := strings.TrimSpace(files["smartos-product"]); text != "" {
 		name = smartOSName(text)
@@ -172,6 +190,9 @@ func FormatDistro(osName, shorthand string, files map[string]string) (display, a
 		return display, "Armbian", name, id, ""
 	}
 	if display, ascii, name, id, ok := legacyRelease(shorthand, files); ok {
+		return display, ascii, name, id, ""
+	}
+	if display, ascii, name, id, ok := lateDistro(osName, shorthand, files); ok {
 		return display, ascii, name, id, ""
 	}
 	if text := cleanIssue(files["issue"]); text != "" {

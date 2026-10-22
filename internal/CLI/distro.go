@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -12,10 +11,13 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 	var distro string
 	var asciiName string
 	var releaseName, releaseID, releaseLike string
+	hideArch := false
+	files := collectReleaseFiles()
+	enrichRelease(files)
 
 	switch osName {
-	case Linux, BSD, MINIX, Ironclad, FreeBSD, OpenBSD, NetBSD, DragonFly, Bitrig:
-		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, collectReleaseFiles())
+	case Linux, BSD, MINIX, Ironclad, FreeBSD, OpenBSD, NetBSD, DragonFly, Bitrig, "Fiwix", "QNX":
+		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, files)
 		if isBSDFamily(osName) && (distro == osName || distro == "") {
 			if rel := strings.TrimSpace(UName("-r")); rel != "" && !strings.Contains(distro, rel) {
 				distro = strings.TrimSpace(osName + " " + rel)
@@ -24,34 +26,41 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 	case Darwin:
 		product := strings.TrimSpace(utils.RunCommand("sw_vers", "-productName"))
 		version := strings.TrimSpace(utils.RunCommand("sw_vers", "-productVersion"))
-		low := strings.ToLower(product)
-		if product == "" || strings.Contains(low, "mac") {
-			distro = fmt.Sprintf("%s %s", macOSCodename(version), version)
-			asciiName = Darwin
-		} else {
-			distro = strings.TrimSpace(product + " " + version)
-			asciiName = product
-		}
+		build := strings.TrimSpace(utils.RunCommand("sw_vers", "-buildVersion"))
+		distro, asciiName, hideArch = formatApple(product, version, build, distroShorthand)
 	case Windows:
-		// For Windows, use PowerShell to query ProductName
 		psCmd := `Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object -ExpandProperty ProductName`
 		out := utils.RunCommand("powershell", "-Command", psCmd)
 		build := utils.RunCommand("powershell", "-Command", "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty CurrentBuildNumber")
-		distro = strings.TrimSpace(out)
-		if strings.Contains(distro, "Windows 10") {
-			if buildInt := strings.TrimSpace(build); buildInt >= "22000" {
-				distro = strings.Replace(distro, "Windows 10", "Windows 11", 1)
-			}
-		}
+		distro = windowsProduct(out, build)
+		asciiName = windowsArt(distro)
 	case Solaris, illumos:
-		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, collectReleaseFiles())
+		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, files)
 	case Haiku:
-		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, collectReleaseFiles())
+		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, files)
 	case AIX:
-		distro = strings.TrimSpace(utils.RunCommand("oslevel"))
+		level := strings.TrimSpace(utils.RunCommand("oslevel"))
+		switch {
+		case level == "":
+			distro = "AIX"
+		case strings.HasPrefix(strings.ToLower(level), "aix"):
+			distro = level
+		default:
+			distro = "AIX " + level
+		}
+		asciiName = "AIX"
+	case IRIX:
+		distro = strings.TrimSpace("IRIX " + utils.RunCommand("uname", "-r"))
+		asciiName = "IRIX"
+	case Interix:
+		distro = strings.TrimSpace("Interix " + utils.RunCommand("uname", "-r"))
+		asciiName = "Interix"
+	case digitalUNIX:
+		distro = strings.TrimSpace("digital UNIX " + utils.RunCommand("uname", "-r"))
+		asciiName = "digitalUNIX"
 	default:
 		if isBSDFamily(osName) {
-			distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, collectReleaseFiles())
+			distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, files)
 			if distro == osName || distro == "" {
 				if rel := strings.TrimSpace(UName("-r")); rel != "" && !strings.Contains(distro, rel) {
 					distro = strings.TrimSpace(osName + " " + rel)
@@ -90,7 +99,7 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 		}
 	}
 
-	if os_arch == utils.ON {
+	if os_arch == utils.ON && !hideArch {
 		distro += " " + machine_arch
 	}
 
@@ -161,12 +170,28 @@ func collectReleaseFiles() map[string]string {
 	put("bluewhite64-version", "/etc/bluewhite64-version", false)
 	put("crux-release", "/etc/crux-release", false)
 	put("tizen-release", "/etc/tizen-release", false)
+	put("krass-version", "/etc/KrassOS.version", false)
+	put("manjaro-release", "/etc/manjaro-release", false)
+	put("q4os-version", "/etc/q4os_version", false)
+	put("nixos-marker", "/etc/NIXOS", true)
+	put("linspire-version", "/etc/linspire-version", false)
+	put("lindows-version", "/etc/lindowsos-version", false)
+	put("astra-version", "/etc/astra_version", false)
+	put("vzlinux-release", "/etc/vzlinux-release", false)
+	put("slitaz-release", "/etc/slitaz-release", false)
+	put("opnsense-version", "/usr/local/opnsense/version/opnsense", false)
+	put("synology-version", "/etc/VERSION", false)
+	put("floflis-release", "/etc/floflis-release", true)
+	put("qnx-props", "/pps/services/deviceproperties", false)
+	put("qnx-version", "/base/etc/os.version", false)
 	put("issue", "/etc/issue", false)
 	return files
 }
 
 func macOSCodename(version string) string {
 	switch {
+	case strings.HasPrefix(version, "10.16"):
+		return "macOS Big Sur"
 	case strings.HasPrefix(version, "10.15"):
 		return "macOS Catalina"
 	case strings.HasPrefix(version, "10.14"):
