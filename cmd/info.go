@@ -1,14 +1,10 @@
 package cmd
 
 import (
-	"embed"
 	"fmt"
-	"log"
 	"os"
-	"reflect"
-	"regexp"
+	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
@@ -57,17 +53,39 @@ type hardware struct {
 
 	cpu string
 	gpu string
+	npu string
 
 	memory string
+	swap   string
 
 	network string
 
 	bluetooth string
 
+	disk          string
+	battery       string
+	local_ip      string
+	public_ip     string
+	users         string
+	locale        string
+	gpu_driver    string
+	song          string
+	java_ver      string
+	python_ver    string
+	node_ver      string
+	term_size     string
+	window_size   string
+	power_adapter string
+
+	plain    bool
+	verbose  bool
+	disabled map[string]bool
+
 	resolution string
 
 	term      string
 	term_font string
+	font      string
 
 	ascii_bold string
 	bold       string
@@ -97,14 +115,21 @@ func (h *hardware) Get_model() {
 }
 func (h *hardware) Get_title() {
 	title, err := cli.GetTitle()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	if err != nil || title == nil {
+		return
 	}
 	h.user = title.User
 	h.hostname = title.Hostname
-	h.title = title.Title
 	h.length = title.Length
+	if h.plainMode() {
+		h.title = title.User + "@" + title.Hostname
+		return
+	}
+	bold := ""
+	if h.Bold != utils.OFF {
+		bold = "\033[1m"
+	}
+	h.title = logo.TitleColor() + bold + title.User + logo.AtColor() + "@" + logo.TitleColor() + bold + title.Hostname + logo.ResetCode()
 }
 
 func (h *hardware) Get_kernel() {
@@ -116,7 +141,11 @@ func (h *hardware) Get_uptime() {
 }
 
 func (h *hardware) Get_packages() {
-	h.packages = cli.DetectPackages(h.os)
+	h.packages = cli.DetectPackages(h.os, cli.PackageConfig{
+		Managers: h.PackageManagers,
+		Separate: h.PackageSeparate != utils.OFF,
+		Minimal:  h.PackageMinimal == utils.ON,
+	})
 }
 
 func (h *hardware) Get_shell() {
@@ -128,7 +157,7 @@ func (h *hardware) Get_editor() {
 }
 
 func (h *hardware) Get_de() {
-	h.de = gui.GetDE(h.os, h.distro, h.KernelName)
+	h.de = gui.GetDE(h.os, h.distro, h.KernelName, h.DeVersion)
 }
 
 func (h *hardware) Get_wm() {
@@ -136,24 +165,34 @@ func (h *hardware) Get_wm() {
 }
 
 func (h *hardware) Get_wm_theme() {
-	h.wm_theme = gui.GetTheme()
+	if h.wm == "" {
+		h.Get_wm()
+	}
+	h.wm_theme = gui.GetWMTheme(h.wm)
 }
 
 func (h *hardware) Get_cpu() {
-	if h.CPUTemp == utils.ON {
-		h.CPUTemp = "C"
+	temp := h.CPUTemp
+	if temp == utils.ON {
+		temp = "C"
 	}
-	// One read of /proc/cpuinfo. The previous form called GetCPU twice
-	// and kept only the second result.
-	h.cpu = cli.GetCPU(h.os, h.KernelMachine, h.CPUCores, h.CPUSpeed, utils.ON, h.CPUBrand, h.SpeedType, h.SpeedShorthand, h.CPUTemp)
+	h.cpu = cli.GetCPU(h.os, h.KernelMachine, h.CPUCores, h.CPUSpeed, temp, h.CPUBrand, h.SpeedType, h.SpeedShorthand, temp)
 }
 
 func (h *hardware) Get_gpu() {
-	h.gpu = dev.GetGPU(h.os)
+	h.gpu = dev.GetGPU(h.os, h.GPUBrand, h.GPUType)
+}
+
+func (h *hardware) Get_npu() {
+	h.npu = dev.GetAccel()
 }
 
 func (h *hardware) Get_memory() {
 	h.memory = cli.PrintMem(h.os, h.Memory, h.ProgressBar)
+}
+
+func (h *hardware) Get_swap() {
+	h.swap = cli.PrintSwap(h.os, h.Memory.MemoryPercent == utils.ON)
 }
 
 func (h *hardware) Get_network() {
@@ -165,11 +204,11 @@ func (h *hardware) Get_bluetooth() {
 }
 
 func (h *hardware) Get_song() {
-
+	h.song = dev.GetSong(h.SongFormat, h.MusicPlayer)
 }
 
 func (h *hardware) Get_resolution() {
-	h.resolution = dev.GetResolution(h.os, h.KernelMachine)
+	h.resolution = dev.GetResolution(h.os, h.KernelMachine, h.RefreshRate == utils.ON)
 }
 
 func (h *hardware) Get_style() {
@@ -184,7 +223,7 @@ func (h *hardware) Get_icons() {
 }
 
 func (h *hardware) Get_font() {
-	h.term_font = gui.GetFont()
+	h.font = gui.GetFont()
 }
 
 func (h *hardware) Get_cursor() {
@@ -192,15 +231,15 @@ func (h *hardware) Get_cursor() {
 }
 
 func (h *hardware) Get_java_ver() {
-
+	h.java_ver = cli.ToolVersion([]string{"java"}, "-version")
 }
 
 func (h *hardware) Get_python_ver() {
-
+	h.python_ver = cli.ToolVersion([]string{"python3", "python"}, "--version")
 }
 
 func (h *hardware) Get_node_ver() {
-
+	h.node_ver = cli.ToolVersion([]string{"node"}, "--version")
 }
 
 func (h *hardware) Get_term() {
@@ -208,46 +247,63 @@ func (h *hardware) Get_term() {
 }
 
 func (h *hardware) Get_term_font() {
-	h.term_font = gui.GetFont()
+	if h.term == "" {
+		h.Get_term()
+	}
+	h.term_font = gui.GetTermFont(h.term)
 }
 
 func (h *hardware) Get_disk() {
-
+	width, _ := strconv.Atoi(h.BarLength)
+	h.disk = cli.GetDisk(cli.DiskReport{
+		Show:      h.DiskShow,
+		Subtitle:  h.DiskSubtitle,
+		Percent:   h.DiskPercent,
+		Display:   h.DiskDisplay,
+		BarWidth:  width,
+		BarFilled: h.BarCharTotal,
+		BarEmpty:  h.BarCharElapsed,
+	})
 }
 
 func (h *hardware) Get_power_adapter() {
-
+	h.power_adapter = dev.GetPowerAdapter()
 }
 
 func (h *hardware) Get_battery() {
-
+	h.battery = dev.GetBattery()
 }
 
 func (h *hardware) Get_local_ip() {
-
+	h.local_ip = dev.LocalIP(h.LocalIPInterface)
 }
 
 func (h *hardware) Get_public_ip() {
-
+	h.public_ip = dev.PublicIP(h.PublicIPHost, h.PublicIPTimeout)
 }
 
 func (h *hardware) Get_users() {
-
+	h.users = cli.GetUsers()
 }
 
 func (h *hardware) Get_locale() {
-
+	h.locale = cli.GetLocale()
 }
 
 func (h *hardware) Get_gpu_driver() {
-
+	h.gpu_driver = dev.GetGPUDriver()
 }
 
 func (h *hardware) Get_cols() {
-	// Color blocks adjust for the VS Code terminal, which GetTerm records.
-	// Calling it here waits for that result when both run together.
-	_ = cli.GetTerm(h.os)
-	h.cols = cli.Getcols(h.leftMax)
+	if h.plainMode() || h.Enabled == utils.OFF {
+		h.cols = ""
+		return
+	}
+	start, end := 0, 15
+	fmt.Sscanf(strings.NewReplacer("(", " ", ")", " ", ",", " ").Replace(h.BlockRange), "%d %d", &start, &end)
+	width, _ := strconv.Atoi(strings.TrimSpace(h.BlockWidth))
+	height, _ := strconv.Atoi(strings.TrimSpace(h.BlockHeight))
+	h.cols = strings.Join(cli.RenderBlocks(width, height, start, end), "\n")
 }
 
 func (h *hardware) Get_image_source() {
@@ -263,11 +319,22 @@ func (h *hardware) Get_w3m_img_path() {
 }
 
 func (h *hardware) Get_window_size() {
-
+	if os.Getenv("DISPLAY") == "" || !utils.CommandExists("xdotool") {
+		h.window_size = ""
+		return
+	}
+	out := utils.RunCommand("xdotool", "getactivewindow", "getwindowgeometry")
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Geometry:") {
+			h.window_size = strings.TrimSpace(strings.TrimPrefix(line, "Geometry:"))
+			return
+		}
+	}
 }
 
 func (h *hardware) Get_term_size() {
-
+	h.term_size = cli.GetTermSize()
 }
 
 func (h *hardware) Get_image_size() {
@@ -275,30 +342,30 @@ func (h *hardware) Get_image_size() {
 }
 
 func (h *hardware) Get_underline() {
-	switch h.UnderlineEnabled {
-	case utils.ON:
-		h.underline = strings.Repeat("-", 10)
-	case utils.OFF:
+	if h.UnderlineEnabled == utils.OFF {
 		h.underline = ""
+		return
 	}
+	if h.length == 0 {
+		h.Get_title()
+	}
+	n := h.length
+	if n <= 0 {
+		n = 8
+	}
+	ch := h.UnderlineChar
+	if ch == "" {
+		ch = "-"
+	}
+	line := strings.Repeat(ch, n)
+	if h.plainMode() {
+		h.underline = line
+		return
+	}
+	h.underline = logo.UnderlineColor() + line + logo.ResetCode()
 }
 
-func (h *hardware) Get_bold() {
-	switch h.ascii_bold {
-	case utils.ON:
-		h.ascii_bold = "\\e[1m"
-	case utils.OFF:
-		h.ascii_bold = ""
-	}
-
-	switch h.bold {
-	case utils.ON:
-		h.bold = "\\e[1m"
-	case utils.OFF:
-		h.bold = ""
-	}
-
-}
+func (h *hardware) Get_bold() {}
 
 func (h *hardware) Get_full_path() {
 
@@ -306,248 +373,4 @@ func (h *hardware) Get_full_path() {
 
 func (h *hardware) Get_user_config() {
 
-}
-
-func get_cache_dir() string {
-	cacheDir := os.Getenv("TMPDIR")
-	if cacheDir == "" {
-		cacheDir = "/tmp"
-	}
-	return cacheDir
-}
-
-func (h *hardware) Get_ppid() {
-
-}
-
-func (h *hardware) Get_process_name() {
-
-}
-
-func (h *hardware) Get_args() {
-
-}
-
-// func info(subtitle, function_name string) {
-
-// }
-
-// func prin() {
-
-// }
-
-// func print_info(asciiData, lines []string) {
-// 	info.PrintInfo(asciiData, lines)
-// }
-
-func image_backend() {
-
-}
-func old_functions() {
-
-}
-
-func dynamic_prompt() {
-
-}
-
-func Get_distro_ascii(ascii_distro, image_source string, ASCIIFiles embed.FS) []string {
-	return logo.PrintASCII(ascii_distro, image_source, ASCIIFiles)
-}
-
-func cache_uname() (string, string, string, string) {
-	uname_arr := strings.Split(cli.UName("-srm"), " ")
-	kernel_name := uname_arr[0]
-	kernel_version := uname_arr[1]
-	kernel_machine := uname_arr[2]
-
-	// TODO: https://github.com/ffgan/hyfetch/blob/master/neofetch#L6384
-	var darwin_name string
-	return kernel_name, kernel_version, kernel_machine, darwin_name
-}
-
-// Global state variables (mimicking bash script state)
-var (
-	subtitle     string
-	prin         bool
-	info_height  int
-	json         bool
-	reset        string = "\x1b[0m"
-	colon_color  string = ""
-	separator    string = ":"
-	info_color   string = ""
-	bold         string = "\x1b[1m"
-	text_padding string = ""
-	zws          string = "\u200B" // zero-width space
-)
-
-func NewContext(target hardware) *Context {
-	return &Context{
-		target: target,
-		values: make(map[string]string),
-	}
-}
-
-type Context struct {
-	target hardware
-	values map[string]string
-}
-
-func lineFunc(line []string) (prefix, name string) {
-	if len(line) == 1 {
-		return "", line[0]
-	}
-	if len(line) >= 2 {
-		return line[0], line[1]
-	}
-	return "", ""
-}
-
-// prefetch detects every info line concurrently. fastfetch's default is
-// the same shape: modules do not wait on each other, and the slow ones
-// (packages, theme, window manager) overlap.
-func (c *Context) prefetch(lines [][]string) {
-	seen := make(map[string]struct{}, len(lines))
-	var wg sync.WaitGroup
-	for _, line := range lines {
-		_, name := lineFunc(line)
-		if name == "" {
-			continue
-		}
-		// Distro is already filled in before prefetch. Detecting it again
-		// writes fields the kernel and DE modules are reading.
-		if name == "distro" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		wg.Add(1)
-		go func(name string) {
-			defer wg.Done()
-			c.callMethod("Get_" + name)
-		}(name)
-	}
-	wg.Wait()
-}
-
-func (c *Context) info(arg1, arg2 string) {
-	if arg2 != "" {
-		subtitle = arg1
-	}
-
-	prin = false
-
-	// Detection already ran in prefetch. Nothing in Get_* sets prin,
-	// so the print path is the only one left.
-
-	output := c.getField(arg2)
-	fmt.Printf("\033[%dC", c.target.leftMax)
-	// Print based on conditions
-	if arg2 != "" && strings.TrimSpace(output) != "" {
-		// c.prin(arg1, output)
-		fmt.Println(Info(arg1, output))
-	} else if strings.TrimSpace(output) != "" {
-		c.prin(output, "")
-	} else {
-		log.Printf("Info: Couldn't detect %s.", arg1)
-	}
-
-	// Unset subtitle
-	subtitle = ""
-}
-
-func Info(name, data string) string {
-	if data == "" {
-		return ""
-	}
-	if name != "" {
-		name = "\033[1;34m" + name + ": \033[0m"
-	}
-	return name + data
-}
-
-// prin prints formatted output
-func (c *Context) prin(arg1, arg2 string) {
-	var str string
-	var subtitle_color string
-
-	// If $2 doesn't exist we format $1 as info
-	if trim(arg1) != "" && arg2 != "" {
-		if json {
-			fmt.Printf("    %s\n", Info(arg1, arg2))
-			return
-		}
-		if arg2 != "" {
-			str = arg1 + ": " + arg2
-		} else {
-			str = arg1
-		}
-	} else {
-		if arg2 != "" {
-			str = arg2
-		} else {
-			str = arg1
-		}
-		subtitle_color = info_color
-	}
-
-	// Remove all reset sequences from string
-	str = strings.ReplaceAll(trim(str), "\x1b[0m", "")
-
-	// Calculate length without escape sequences
-	length := stripSequences(str)
-	_ = len(length) // length variable for compatibility
-
-	// Format the output
-	str = strings.Replace(str, ":", reset+colon_color+separator+info_color, 1)
-	str = subtitle_color + bold + str
-
-	// Print the info
-	var padding string
-	if text_padding != "" {
-		padding = fmt.Sprintf("\x1b[%sC", text_padding)
-	}
-
-	// Replace literal \n (not newlines) in output
-	str = strings.ReplaceAll(str, "\\n", "")
-
-	fmt.Printf("%s%s%s%s \n", padding, zws, str, reset)
-
-	// Calculate info height
-	info_height++
-
-	// Log that prin was used
-	prin = true
-}
-
-// trim removes leading and trailing whitespace
-func trim(s string) string {
-	return strings.TrimSpace(s)
-}
-
-// stripSequences removes ANSI escape sequences
-var ansiSeq = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-
-func stripSequences(s string) string {
-	return ansiSeq.ReplaceAllString(s, "")
-}
-
-func (c *Context) getField(name string) string {
-	v := reflect.ValueOf(c.target)
-	field := v.FieldByName(name)
-	return field.String()
-}
-
-func (c *Context) callMethod(methodName string) {
-	v := reflect.ValueOf(&c.target)
-
-	method := v.MethodByName(methodName)
-	if !method.IsValid() {
-		fmt.Printf("Error: Method %s not found\n", methodName)
-		return
-	}
-
-	method.Call(nil)
 }

@@ -10,13 +10,15 @@ import (
 	"github.com/ffgan/gf/internal/utils"
 )
 
-// x11WMs are process names fastfetch/neofetch recognise. Matching comm
-// from /proc skips the xprop round trip on the common desktops.
+// x11WMs are process names fastfetch and neofetch recognise. Matching
+// comm from /proc skips the xprop round trip on the common desktops.
 var x11WMs = []string{
 	"sowm", "catwm", "fvwm", "dwm", "2bwm", "monsterwm", "tinywm", "x11fs", "xmonad",
-	"awesome", "bspwm", "compiz", "cwm", "enlightenment", "fluxbox", "herbstluftwm",
-	"i3", "icewm", "jwm", "kwin", "kwin_x11", "leftwm", "marco", "metacity", "muffin",
-	"mutter", "openbox", "pekwm", "qtile", "spectrwm", "stumpwm", "xfwm4",
+	"xfwm4", "openbox", "i3", "mutter", "kwin_x11", "kwin_wayland", "kwin", "awesome",
+	"bspwm", "herbstluftwm", "qtile", "leftwm", "spectrwm", "icewm", "fluxbox",
+	"jwm", "pekwm", "marco", "muffin", "compiz", "enlightenment", "cinnamon",
+	"metacity", "cwm", "stumpwm",
+	"sway", "Hyprland", "wayfire", "river", "weston", "labwc", "cage",
 }
 
 func GetWM(osName, kernelName string) string {
@@ -27,6 +29,16 @@ func GetWM(osName, kernelName string) string {
 }
 
 func detectWM(osName, kernelName string) string {
+	if osName == cli.Windows {
+		// Supported Windows composites with DWM. Reading dwm.exe's
+		// version avoids walking the process list.
+		name := "Desktop Window Manager"
+		if ver := windowsWMVersion(); ver != "" {
+			name += " " + ver
+		}
+		return name
+	}
+
 	xdgRuntime := os.Getenv("XDG_RUNTIME_DIR")
 	waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
 	if waylandDisplay == "" {
@@ -82,8 +94,13 @@ func detectWM(osName, kernelName string) string {
 	// --- macOS detection ---
 	if wm == "" {
 		switch osName {
-		case cli.MacOSX, cli.MacOS:
-			psLine := utils.RunCommand("ps", "-e")
+		case cli.MacOSX, cli.MacOS, cli.Darwin:
+			psLine := ""
+			if names, ok := utils.ProcessNames(); ok {
+				psLine = strings.Join(names, "\n")
+			} else {
+				psLine = utils.RunCommand("ps", "-e")
+			}
 			switch {
 			case strings.Contains(psLine, "chunkwm"):
 				wm = "chunkwm"
@@ -99,21 +116,6 @@ func detectWM(osName, kernelName string) string {
 				wm = "Rectangle"
 			default:
 				wm = "Quartz Compositor"
-			}
-
-		case cli.Windows:
-			tasklist := utils.RunCommand("tasklist")
-			for _, w := range []string{"bugn", "Windawesome", "blackbox", "emerge", "litestep"} {
-				if strings.Contains(tasklist, w) {
-					wm = w
-					break
-				}
-			}
-			if wm == "blackbox" {
-				wm = "bbLean (Blackbox)"
-			}
-			if wm != "" {
-				wm += ", DWM.exe"
 			}
 
 		case cli.FreeMiNT:
@@ -136,6 +138,16 @@ func detectWM(osName, kernelName string) string {
 	}
 
 	// --- normalize names ---
+	switch wm {
+	case "xfwm4":
+		wm = "Xfwm4"
+	case "kwin_x11", "kwin_wayland":
+		wm = "KWin"
+	case "mutter":
+		wm = "Mutter"
+	case "openbox":
+		wm = "Openbox"
+	}
 	if strings.Contains(wm, "WINDOWMAKER") {
 		wm = "wmaker"
 	}

@@ -12,20 +12,20 @@ import (
 	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetResolution(osName, machine string) string {
+func GetResolution(osName, machine string, refresh bool) string {
 	var resolution string
 
 	switch osName {
-	case cli.MacOS:
+	case cli.MacOS, cli.MacOSX, cli.Darwin:
 		resolution = getResolutionMac()
 	case cli.Iphone:
 		resolution = getResolutionIOS(machine)
 	case cli.Windows:
-		resolution = getResolutionWindows()
+		resolution = getResolutionWindows(refresh)
 	case cli.Haiku:
 		resolution = getResolutionHaiku()
 	default:
-		resolution = getResolutionX11()
+		resolution = getResolutionX11(refresh)
 	}
 
 	resolution = strings.TrimSuffix(resolution, ",")
@@ -119,23 +119,6 @@ func getResolutionIOS(machine string) string {
 	return ""
 }
 
-// --- Windows ---
-func getResolutionWindows() string {
-	out, err := utils.CommandOutput("wmic", "path", "Win32_VideoController", "get", "CurrentHorizontalResolution,CurrentVerticalResolution")
-	if err != nil {
-		return ""
-	}
-	lines := strings.Split(string(out), "\n")
-	var resolutions []string
-	for _, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) == 2 {
-			resolutions = append(resolutions, fmt.Sprintf("%sx%s", fields[0], fields[1]))
-		}
-	}
-	return strings.Join(resolutions, ", ")
-}
-
 // --- Haiku ---
 func getResolutionHaiku() string {
 	out, err := utils.CommandOutput("screenmode")
@@ -151,15 +134,29 @@ func getResolutionHaiku() string {
 }
 
 // --- Linux/X11 ---
-func getResolutionX11() string {
-	// 优先使用 xrandr
-	if utils.PathExists("xrandr") && os.Getenv("DISPLAY") != "" && os.Getenv("WAYLAND_DISPLAY") == "" {
+func getResolutionX11(refresh bool) string {
+	if utils.CommandExists("xrandr") && os.Getenv("DISPLAY") != "" && os.Getenv("WAYLAND_DISPLAY") == "" {
 		out, err := utils.CommandOutput("xrandr", "--nograb", "--current")
 		if err != nil {
 			return ""
 		}
+		text := string(out)
+		if refresh {
+			re := regexp.MustCompile(`(?m)^\s*([0-9]+)x([0-9]+)\s+([0-9.]+)\*`)
+			matches := re.FindAllStringSubmatch(text, -1)
+			var list []string
+			for _, m := range matches {
+				if len(m) > 3 {
+					hz := strings.TrimSuffix(m[3], ".00")
+					list = append(list, fmt.Sprintf("%sx%s @ %sHz", m[1], m[2], hz))
+				}
+			}
+			if len(list) > 0 {
+				return strings.Join(list, ", ")
+			}
+		}
 		re := regexp.MustCompile(`([0-9]+)x([0-9]+)\+`)
-		matches := re.FindAllStringSubmatch(string(out), -1)
+		matches := re.FindAllStringSubmatch(text, -1)
 		var list []string
 		for _, m := range matches {
 			if len(m) > 2 {
@@ -170,7 +167,7 @@ func getResolutionX11() string {
 	}
 
 	// fallback: xdpyinfo
-	if utils.PathExists("xdpyinfo") && os.Getenv("DISPLAY") != "" {
+	if utils.CommandExists("xdpyinfo") && os.Getenv("DISPLAY") != "" {
 		out, err := utils.CommandOutput("xdpyinfo")
 		if err == nil {
 			re := regexp.MustCompile(`dimensions:\s+([0-9]+x[0-9]+)`)
@@ -193,8 +190,23 @@ func getResolutionX11() string {
 				}
 			}
 		}
-		return strings.Join(list, ", ")
+		if joined := strings.Join(list, ", "); joined != "" {
+			return joined
+		}
 	}
 
-	return ""
+	return resolutionFromFB()
+}
+
+func resolutionFromFB() string {
+	data, err := os.ReadFile("/sys/class/graphics/fb0/virtual_size")
+	if err != nil {
+		return ""
+	}
+	s := strings.TrimSpace(string(data))
+	s = strings.ReplaceAll(s, ",", "x")
+	if !strings.Contains(s, "x") || s == "0x0" {
+		return ""
+	}
+	return s
 }

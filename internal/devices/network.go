@@ -18,17 +18,38 @@ func GetNetwork(osName string) string {
 	if strings.Contains(osName, cli.Linux) {
 		return getNetworkLinux()
 	}
-	if strings.Contains(osName, cli.MacOSX) || strings.Contains(osName, cli.MacOS) {
+	if osName == cli.Darwin || strings.Contains(osName, cli.MacOSX) || strings.Contains(osName, cli.MacOS) {
 		return getNetworkMac()
 	}
-	return "Unknown OS"
+	if cli.BSDFamily(osName) {
+		return getNetworkBSD()
+	}
+	return ""
+}
+
+func getNetworkBSD() string {
+	out := utils.RunCommand("ifconfig", "-l")
+	if out == "" {
+		return ""
+	}
+	var parts []string
+	for _, name := range strings.Fields(out) {
+		if name == "lo0" || name == "lo" || strings.HasPrefix(name, "pflog") || strings.HasPrefix(name, "pfsync") {
+			continue
+		}
+		parts = append(parts, name)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func getNetworkLinux() string {
-	var networks []string
-
 	entries, _ := filepath.Glob("/sys/class/net/*")
+	var parts []string
 	for _, ifacePath := range entries {
+		name := filepath.Base(ifacePath)
+		if name == "lo" {
+			continue
+		}
 		operstate, err := os.ReadFile(filepath.Join(ifacePath, "operstate"))
 		if err != nil || strings.TrimSpace(string(operstate)) != "up" {
 			continue
@@ -37,25 +58,39 @@ func getNetworkLinux() string {
 			continue
 		}
 
+		label := name
 		if _, err := os.Stat(filepath.Join(ifacePath, "phy80211")); err == nil {
-			// Wi-Fi device
-			networks = append(networks, "Wifi")
+			label = name + " (Wi-Fi)"
 			phy, err := os.ReadFile(filepath.Join(ifacePath, "phy80211", "name"))
 			if err == nil {
 				out, _ := utils.CommandOutput("iw", strings.TrimSpace(string(phy)), "info")
 				if bytes.Contains(out, []byte("VHT Capabilities")) {
-					networks = append(networks, "6")
+					label = name + " (Wi-Fi 6)"
 				}
 			}
-		} else {
-			speed, err := os.ReadFile(filepath.Join(ifacePath, "speed"))
-			if err == nil {
-				networks = append(networks, strings.TrimSpace(string(speed)))
+		} else if speedRaw, err := os.ReadFile(filepath.Join(ifacePath, "speed")); err == nil {
+			speed := strings.TrimSpace(string(speedRaw))
+			if formatted := formatLinkSpeed(speed); formatted != "" {
+				label = name + " @ " + formatted
 			}
 		}
+		parts = append(parts, label)
 	}
+	return strings.Join(parts, ", ")
+}
 
-	return formatNetworks(networks)
+func formatLinkSpeed(speed string) string {
+	if speed == "" || speed == "-1" {
+		return ""
+	}
+	val, err := strconv.Atoi(speed)
+	if err != nil || val <= 0 {
+		return ""
+	}
+	if val%1000 == 0 {
+		return fmt.Sprintf("%d Gbps", val/1000)
+	}
+	return fmt.Sprintf("%d Mbps", val)
 }
 
 func getNetworkMac() string {

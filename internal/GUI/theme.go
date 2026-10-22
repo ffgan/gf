@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -12,6 +13,9 @@ import (
 )
 
 func GetTheme() string {
+	if runtime.GOOS == "windows" {
+		return windowsTheme()
+	}
 	ctx := StyleContext{
 		Name:      "gtk-theme-name",
 		GSettings: "gtk-theme",
@@ -61,8 +65,10 @@ func readGtk2Theme(name string) string {
 }
 
 func readGtk3Theme(name, key string) string {
-	conf := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "gtk-3.0", "settings.ini")
-	if conf == "" {
+	var conf string
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		conf = filepath.Join(dir, "gtk-3.0", "settings.ini")
+	} else {
 		conf = filepath.Join(os.Getenv("HOME"), ".config", "gtk-3.0", "settings.ini")
 	}
 	if utils.FileExists(conf) {
@@ -119,9 +125,19 @@ func readQt5ctTheme(key string) string {
 	return ""
 }
 
-var gsettingsCache sync.Map
+var (
+	gsettingsOnce  sync.Once
+	gsettingsOK    bool
+	gsettingsCache sync.Map
+)
 
 func getGSettings(schema, key string) string {
+	gsettingsOnce.Do(func() {
+		gsettingsOK = utils.CommandExists("gsettings")
+	})
+	if !gsettingsOK {
+		return ""
+	}
 	cacheKey := schema + "\x00" + key
 	if v, ok := gsettingsCache.Load(cacheKey); ok {
 		return v.(string)
@@ -209,16 +225,15 @@ func readXfconf(prop string) string {
 var themeOrder = []string{"GTK2", "GTK3", "Qt", "KDE"}
 
 func buildThemeString(parts map[string]string) string {
-	var res string
-	for _, k := range themeOrder {
-		v := parts[k]
-		if v == "" {
+	seen := map[string]bool{}
+	var chunks []string
+	for _, key := range themeOrder {
+		value := strings.Trim(strings.TrimSpace(parts[key]), `"'`)
+		if value == "" || seen[value] {
 			continue
 		}
-		if res != "" {
-			res += ", "
-		}
-		res += fmt.Sprintf("%s [%s]", v, k)
+		seen[value] = true
+		chunks = append(chunks, fmt.Sprintf("%s [%s]", value, key))
 	}
-	return res
+	return strings.Join(chunks, ", ")
 }

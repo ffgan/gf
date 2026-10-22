@@ -8,6 +8,46 @@ import (
 	"github.com/ffgan/gf/internal/logo"
 )
 
+// Show prints the logo on the left and info rows on the right.
+func Show(art, rows []string, gap int) {
+	if gap < 0 {
+		gap = 0
+	}
+	width := 0
+	for _, line := range art {
+		if n := visibleLen(line); n > width {
+			width = n
+		}
+	}
+	n := len(rows)
+	if len(art) > n {
+		n = len(art)
+	}
+	if n == 0 {
+		return
+	}
+	gapText := strings.Repeat(" ", gap)
+	for i := 0; i < n; i++ {
+		left := ""
+		if i < len(art) {
+			left = art[i]
+		}
+		right := ""
+		if i < len(rows) {
+			right = rows[i]
+		}
+		if len(art) == 0 {
+			fmt.Println(right)
+			continue
+		}
+		pad := width - visibleLen(left)
+		if pad < 0 {
+			pad = 0
+		}
+		fmt.Printf("%s%s%s%s\n", left, "\033[0m", strings.Repeat(" ", pad)+gapText, right)
+	}
+}
+
 func PrintInfo(asciiart []string) int {
 	lines := len(asciiart)
 

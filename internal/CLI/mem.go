@@ -21,14 +21,20 @@ func GetMemory(osName string, config *MemoryConfig) (*MemoryInfo, error) {
 		memUsed, memTotal, err = getMemoryLinux()
 	case Darwin:
 		memUsed, memTotal, err = getMemoryDarwin()
-	case FreeBSD, OpenBSD, NetBSD, DragonFly:
+	case FreeBSD, OpenBSD, NetBSD, DragonFly, BSD, Bitrig:
 		memUsed, memTotal, err = getMemoryBSD(osName)
-	case Solaris:
+	case Solaris, illumos:
 		memUsed, memTotal, err = getMemorySolaris()
 	case Windows:
 		memUsed, memTotal, err = getMemoryWindows()
 	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", osName)
+		if isBSDFamily(osName) {
+			memUsed, memTotal, err = getMemoryBSD(osName)
+		} else if _, statErr := os.Stat("/proc/meminfo"); statErr == nil {
+			memUsed, memTotal, err = getMemoryLinux()
+		} else {
+			return nil, fmt.Errorf("unsupported operating system: %s", osName)
+		}
 	}
 
 	if err != nil {
@@ -174,26 +180,22 @@ func getMemoryBSD(osName string) (int64, int64, error) {
 	var memFree int64
 
 	switch osName {
-	case FreeBSD, DragonFly:
-		pageSize, err := sysctlInt64("hw.pagesize")
-		if err != nil {
-			return 0, 0, err
-		}
-
-		inactive, _ := sysctlInt64("vm.stats.vm.v_inactive_count")
-		unused, _ := sysctlInt64("vm.stats.vm.v_free_count")
-		cache, _ := sysctlInt64("vm.stats.vm.v_cache_count")
-
-		memFree = (inactive + unused + cache) * pageSize / 1024
-
 	case OpenBSD:
 		// OpenBSD uses vmstat for memory info
 		memFree = getVmstatValue(3) // Used is in column 3
 		return memFree * 1024, memTotal, nil
-
-	default:
-		// Generic BSD
+	case NetBSD:
 		memFree = getVmstatValue(5)
+	default:
+		// FreeBSD, DragonFly, and FreeBSD derivatives share these counters.
+		pageSize, err := sysctlInt64("hw.pagesize")
+		if err != nil {
+			return 0, 0, err
+		}
+		inactive, _ := sysctlInt64("vm.stats.vm.v_inactive_count")
+		unused, _ := sysctlInt64("vm.stats.vm.v_free_count")
+		cache, _ := sysctlInt64("vm.stats.vm.v_cache_count")
+		memFree = (inactive + unused + cache) * pageSize / 1024
 	}
 
 	memUsed := memTotal - memFree
@@ -221,12 +223,6 @@ func getMemorySolaris() (int64, int64, error) {
 	return memUsed, memTotal, nil
 }
 
-func getMemoryWindows() (int64, int64, error) {
-	// This is a simplified version for Windows
-	// In practice, you'd use golang.org/x/sys/windows for proper Windows API calls
-	return 0, 0, fmt.Errorf("Windows support requires additional implementation")
-}
-
 func sysctlInt64(name string) (int64, error) {
 	value, err := strconv.ParseInt(strings.TrimSpace(utils.RunCommand("sysctl", "-n", name)), 10, 64)
 	return value, err
@@ -248,6 +244,70 @@ func getVmstatValue(column int) int64 {
 		return value
 	}
 	return 0
+}
+
+func PrintSwap(osName string, showPercent bool) string {
+	var used, total int64
+	var err error
+	switch osName {
+	case Linux:
+		used, total, err = getSwapLinux()
+	case Windows:
+		used, total, err = getSwapWindows()
+	default:
+		return ""
+	}
+	if err != nil || total <= 0 {
+		return ""
+	}
+	return formatFlexiblePair(used, total, showPercent)
+}
+
+func getSwapLinux() (int64, int64, error) {
+	file, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer file.Close()
+	var total, free int64
+	sc := bufio.NewScanner(file)
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) < 2 {
+			continue
+		}
+		value, _ := strconv.ParseInt(fields[1], 10, 64)
+		switch strings.TrimSuffix(fields[0], ":") {
+		case "SwapTotal":
+			total = value
+		case "SwapFree":
+			free = value
+		}
+	}
+	if total <= 0 {
+		return 0, 0, fmt.Errorf("no swap")
+	}
+	return (total - free) * 1024, total * 1024, nil
+}
+
+func formatFlexiblePair(used, total int64, showPercent bool) string {
+	text := flexibleBytes(used) + " / " + flexibleBytes(total)
+	if showPercent && total > 0 {
+		text += fmt.Sprintf(" (%d%%)", used*100/total)
+	}
+	return text
+}
+
+func flexibleBytes(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+	const giB = 1024 * 1024 * 1024
+	const miB = 1024 * 1024
+	if n >= giB {
+		return fmt.Sprintf("%.2f GiB", float64(n)/float64(giB))
+	}
+	return fmt.Sprintf("%.2f MiB", float64(n)/float64(miB))
 }
 
 func formatMemory(usedKiB, totalKiB int64, percent int, config *MemoryConfig) string {
@@ -350,9 +410,8 @@ func PrintMem(osName string, mem configs.Memory, bar configs.ProgressBar) string
 	}
 
 	info, err := GetMemory(osName, config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting memory info: %v\n", err)
-		os.Exit(1)
+	if err != nil || info == nil {
+		return ""
 	}
 	return info.Formatted
 }

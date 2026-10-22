@@ -39,6 +39,9 @@ func getTitle(config TitleConfig) (*TitleInfo, error) {
 			}
 		}
 	}
+	if i := strings.LastIndex(username, `\`); i >= 0 {
+		username = username[i+1:]
+	}
 
 	// Get hostname
 	var hostname string

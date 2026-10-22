@@ -2,73 +2,265 @@ package cmd
 
 import (
 	"embed"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"bufio"
+	"time"
 
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
-	"github.com/ffgan/gf/internal/info"
+	"github.com/ffgan/gf/internal/hyfetch"
+	"github.com/ffgan/gf/internal/logo"
 	"github.com/ffgan/gf/internal/utils"
 )
 
-const neofetch_conf = "/etc/neofetch/default.conf"
+const neofetchConf = "/etc/neofetch/config.conf"
 
 func Run(ASCIIFiles embed.FS) {
-	kernel_name, kernel_version, kernel_machine, darwin_name := cache_uname()
-
-	os := cli.GetOS(kernel_name, darwin_name)
-
-	cache_dir := get_cache_dir()
-
-	var file_path string
-	if utils.FileExists(neofetch_conf) == true {
-		// load Neofetch default config.
-		file_path = neofetch_conf
-	}
-
-	config, err := configs.LoadConfig(file_path)
+	hyOpts, rest, err := hyfetch.SplitArgs(os.Args[1:])
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+		os.Exit(2)
 	}
-
-	parseArgs(config)
-
-	h := hardware{
-		cache_dir:      cache_dir,
-		KernelName:     kernel_name,
-		kernel_version: kernel_version,
-		KernelMachine:  kernel_machine,
-		os:             os,
-		Config:         *config,
+	if hyOpts.Version {
+		fmt.Printf("gf %s\n", Version)
+		os.Exit(0)
 	}
+	os.Args = append([]string{os.Args[0]}, rest...)
 
-	// getsimple()
+	kernelName, kernelVersion, kernelMachine, darwinName := cacheUname()
+	osName := cli.GetOS(kernelName, darwinName)
 
-	// distro, ascii_distro := get_distro(os, config.OSArch, kernel_machine, config.DistroShorthand, config.ASCIIDistro)
-	h.Get_distro()
-	// ascii_bold, bold := get_bold(config.ASCIIBold, config.Bold)
-	h.Get_bold()
-
-	asciiData := Get_distro_ascii(h.ascii_distro, config.ImageSource, ASCIIFiles)
-	h.leftMax = info.PrintInfo(asciiData)
-
-	image_backend()
-	old_functions()
-
-	ctx := NewContext(h)
-	// fastfetch runs every module at once, then prints in order.
-	// Detection is independent; printing still has to be serial because
-	// each line positions the cursor.
-	ctx.prefetch(config.InfoList)
-
-	for _, line := range config.InfoList {
-		var prefix, func_name string
-		if len(line) == 1 {
-			func_name = line[0]
-		} else if len(line) == 2 {
-			prefix = line[0]
-			func_name = line[1]
+	hyPath := hyOpts.ConfigFile
+	if hyPath == "" {
+		hyPath = hyfetch.ConfigPath()
+	}
+	var hyCfg hyfetch.Config
+	hyExists := false
+	if hyOpts.Configure {
+		hyCfg, err = hyfetch.Configure(hyPath, os.Stdin, os.Stdout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			os.Exit(2)
 		}
-		ctx.info(prefix, func_name)
+		hyExists = true
+	} else {
+		hyCfg, hyExists, err = hyfetch.Load(hyPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	hyCfg, err = hyOpts.Apply(hyCfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+		os.Exit(2)
+	}
+	colorOn := hyExists || hyOpts.WantsColor()
+	if colorOn && (hyCfg.Backend == "" || hyCfg.Backend == "neofetch") && len(hyCfg.Args) > 0 {
+		os.Args = append(os.Args, hyCfg.Args...)
 	}
 
-	dynamic_prompt()
+	explicit, skipFile := configFromArgs(os.Args[1:])
+	var filePath string
+	switch {
+	case explicit != "":
+		filePath = explicit
+	case !skipFile:
+		filePath = findConfig()
+	}
+
+	config, err := configs.LoadConfig(filePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+		fallback := configs.DefaultConfig()
+		config = &fallback
+	}
+
+	disabled := parseArgs(config)
+
+	h := &hardware{
+		cache_dir:      getCacheDir(),
+		KernelName:     kernelName,
+		kernel_version: kernelVersion,
+		KernelMachine:  kernelMachine,
+		DarwinName:     darwinName,
+		os:             osName,
+		Config:         *config,
+		verbose:        verbose,
+		disabled:       disabled,
+	}
+	if h.Stdout == utils.ON {
+		h.plain = true
+	}
+
+	logo.SetAppearance(h.ASCIIBold != utils.OFF, h.ASCIIColors, h.Colors)
+	if colorOn && hyCfg.Distro != "" {
+		h.ASCIIDistro = hyCfg.Distro
+	}
+	h.Get_distro()
+
+	if hyOpts.PrintFontLogo {
+		glyph, err := hyfetch.FontLogo(h.distro)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(glyph)
+		return
+	}
+	if hyOpts.TestPrint {
+		fmt.Println(logo.RawASCII(h.ascii_distro, h.ImageSource, ASCIIFiles))
+		return
+	}
+
+	theme := hyfetch.ResolveTheme(hyCfg, hyOpts)
+	now := time.Now()
+	if hyfetch.ShouldPride(hyCfg, hyOpts.June, now) {
+		mode := hyCfg.Mode
+		if mode == "" {
+			mode = hyfetch.Mode8bit
+		}
+		hyfetch.Pride(mode)
+		if !hyOpts.June {
+			hyfetch.MarkPrideShown(now)
+		}
+	}
+
+	var art []string
+	if colorOn && !h.plainMode() && !strings.EqualFold(h.ImageBackend, "off") {
+		art = hyfetchArt(h, hyCfg, hyOpts, theme, ASCIIFiles)
+	} else if !h.plainMode() && !strings.EqualFold(h.ImageBackend, "off") {
+		if lines := imageArt(h.ImageSource); len(lines) > 0 {
+			art = lines
+			logo.ApplyDistro(h.ascii_distro)
+		} else {
+			art = logo.PrintASCII(h.ascii_distro, h.ImageSource, ASCIIFiles)
+		}
+	} else {
+		logo.ApplyDistro(h.ascii_distro)
+	}
+
+	show(art, h.Rows(), h.gap())
+	if hyOpts.AskExit {
+		fmt.Fprint(os.Stderr, "Press enter to exit...")
+		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+	}
+}
+
+func hyfetchArt(h *hardware, cfg hyfetch.Config, opt hyfetch.Options, theme hyfetch.Theme, files embed.FS) []string {
+	source := h.ImageSource
+	if cfg.CustomASCIIPath != "" {
+		source = cfg.CustomASCIIPath
+	}
+	raw := logo.RawASCII(h.ascii_distro, source, files)
+	lines, profile, name, err := hyfetch.Paint(raw, cfg, opt, theme)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+		return logo.PrintASCII(h.ascii_distro, h.ImageSource, files)
+	}
+	if opt.Debug {
+		fmt.Fprintf(os.Stderr, "gf: preset %s, mode %s, align %s, colors %d\n", name, cfg.Mode, cfg.ColorAlign.Mode, len(profile.Colors))
+	}
+	art := strings.Join(lines, "\n")
+	switch cfg.Backend {
+	case "fastfetch":
+		if err := hyfetch.RunFastfetch(art, []string(cfg.Args)); err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			break
+		}
+		os.Exit(0)
+	case "macchina":
+		if err := hyfetch.RunMacchina(art, []string(cfg.Args)); err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			break
+		}
+		os.Exit(0)
+	}
+	return lines
+}
+
+func findConfig() string {
+	var candidates []string
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		candidates = append(candidates, filepath.Join(dir, "gf", "config.conf"))
+	}
+	if home := os.Getenv("HOME"); home != "" {
+		candidates = append(candidates,
+			filepath.Join(home, ".config", "gf", "config.conf"),
+			filepath.Join(home, ".config", "neofetch", "config.conf"),
+		)
+	}
+	candidates = append(candidates, "/etc/gf/config.conf", neofetchConf, "/etc/neofetch/default.conf")
+	for _, path := range candidates {
+		if utils.FileExists(path) {
+			return path
+		}
+	}
+	return ""
+}
+
+func configFromArgs(args []string) (path string, skip bool) {
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--no_config" || args[i] == "--noconfig":
+			skip = true
+		case args[i] == "--config" && i+1 < len(args):
+			i++
+			path = args[i]
+		case strings.HasPrefix(args[i], "--config="):
+			path = strings.TrimPrefix(args[i], "--config=")
+		}
+	}
+	return path, skip
+}
+
+func getCacheDir() string {
+	cacheDir := os.Getenv("TMPDIR")
+	if cacheDir == "" {
+		cacheDir = "/tmp"
+	}
+	return cacheDir
+}
+
+func cacheUname() (string, string, string, string) {
+	parts := strings.Fields(cli.UName("-srm"))
+	for len(parts) < 3 {
+		parts = append(parts, "")
+	}
+	return parts[0], parts[1], parts[2], ""
+}
+
+func imageArt(source string) []string {
+	fi, err := os.Stat(source)
+	if err != nil || !fi.Mode().IsRegular() {
+		return nil
+	}
+	switch strings.ToLower(filepath.Ext(source)) {
+	case ".png", ".jpg", ".jpeg", ".jpe", ".gif", ".webp":
+	default:
+		return nil
+	}
+	tools := []struct {
+		bin  string
+		args []string
+	}{
+		{"chafa", []string{"--symbols", "block", "--size", "40x40", source}},
+		{"catimg", []string{"-w", "40", source}},
+		{"viu", []string{"-w", "40", source}},
+	}
+	for _, tool := range tools {
+		if !utils.CommandExists(tool.bin) {
+			continue
+		}
+		out := utils.RunCommand(tool.bin, tool.args...)
+		if strings.TrimSpace(out) == "" {
+			continue
+		}
+		return strings.Split(strings.TrimRight(out, "\n"), "\n")
+	}
+	return nil
 }

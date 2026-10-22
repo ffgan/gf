@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -101,14 +100,33 @@ func ScanProcesses(psFlags []string, names []string) string {
 			if _, found := running[n]; found {
 				return n
 			}
+			if len(n) > 15 {
+				if _, found := running[n[:15]]; found {
+					return n
+				}
+			}
 		}
 		return ""
 	}
-	args := append([]string{}, psFlags...)
-	out := RunCommand("ps", args...)
+	out := RunCommand("ps", "-e", "-o", "comm=")
+	if strings.TrimSpace(out) == "" && len(psFlags) > 0 {
+		out = RunCommand("ps", psFlags...)
+	}
+	found := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			found[line] = true
+			if fields := strings.Fields(line); len(fields) > 0 {
+				found[fields[len(fields)-1]] = true
+			}
+		}
+	}
 	for _, n := range names {
-		re := regexp.MustCompile(fmt.Sprintf(`(?m)^%s$`, regexp.QuoteMeta(n)))
-		if re.FindString(out) != "" {
+		if found[n] {
+			return n
+		}
+		if len(n) > 15 && found[n[:15]] {
 			return n
 		}
 	}

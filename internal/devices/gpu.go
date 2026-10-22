@@ -4,23 +4,22 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
 	"github.com/ffgan/gf/internal/utils"
 )
 
-func GetGPU(osName string) string {
+func GetGPU(osName, showBrand, gpuType string) string {
 	var gpu string
 
 	switch osName {
 	case cli.Linux:
 		gpu = getLinuxGPU()
 
-	case cli.MacOSX, cli.MacOS:
+	case cli.MacOSX, cli.MacOS, cli.Darwin:
 		gpu = getMacGPU()
 
 	case cli.Iphone:
@@ -28,7 +27,7 @@ func GetGPU(osName string) string {
 	case cli.Windows:
 		gpu = getWindowsGPU()
 
-	case cli.FreeBSD, cli.DragonFly:
+	case cli.FreeBSD, cli.DragonFly, "MidnightBSD", "HardenedBSD", "GhostBSD", "NomadBSD":
 		out := utils.RunCommand("pciconf", "-lv")
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "device") {
@@ -49,24 +48,73 @@ func GetGPU(osName string) string {
 		}
 	}
 
-	// Optional: remove brand names if disabled
-	if os.Getenv("GPU_BRAND") == utils.OFF {
+	if showBrand == utils.OFF {
 		gpu = strings.ReplaceAll(gpu, "AMD", "")
 		gpu = strings.ReplaceAll(gpu, "NVIDIA", "")
 		gpu = strings.ReplaceAll(gpu, "Intel", "")
+		gpu = strings.TrimSpace(gpu)
 	}
+	return filterGPUType(gpu, gpuType)
+}
 
-	return gpu
+func filterGPUType(gpu, kind string) string {
+	if gpu == "" || kind == "" || kind == "all" {
+		return gpu
+	}
+	var keep []string
+	for _, part := range splitGPUList(gpu) {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		integrated := strings.Contains(part, "Intel") || strings.Contains(strings.ToLower(part), "integrated")
+		switch kind {
+		case "integrated":
+			if integrated {
+				keep = append(keep, part)
+			}
+		case "dedicated":
+			if !integrated {
+				keep = append(keep, part)
+			}
+		default:
+			keep = append(keep, part)
+		}
+	}
+	return strings.Join(keep, "\n")
+}
+
+func splitGPUList(gpu string) []string {
+	var parts []string
+	for _, line := range strings.Split(gpu, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.Contains(line, "[") {
+			parts = append(parts, line)
+			continue
+		}
+		for _, part := range strings.Split(line, ", ") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				parts = append(parts, part)
+			}
+		}
+	}
+	return parts
 }
 
 func getLinuxGPU() string {
-	// PCI class 0x03 is a display controller. Reading sysfs is what
-	// fastfetch does; lspci and glxinfo each start a process, and glxinfo
-	// initialises a GL context.
-	if name, ok := gpuFromSysfs(); ok {
+	// SoCs such as the Raspberry Pi expose a GPU through DRM and not PCI.
+	// Name those from sysfs before starting lspci or a GL context.
+	if name, noPCIDisplay := gpuFromSysfs(); name != "" {
 		return name
+	} else if drm := gpuFromDRM(); drm != "" {
+		return drm
+	} else if noPCIDisplay {
+		return ""
 	}
-
 	out := utils.RunCommand("lspci", "-mm")
 	if out == "" {
 		return parseGLXInfo()
@@ -261,213 +309,175 @@ func parseSystemProfiler(data, key string) string {
 	return strings.TrimSuffix(result, ", ")
 }
 
-func gpuFromSysfs() (string, bool) {
-	entries, err := os.ReadDir("/sys/bus/pci/devices")
-	if err != nil {
-		return "", false
-	}
-
-	var found []pciID
-	seenID := map[pciID]struct{}{}
-	for _, e := range entries {
-		base := filepath.Join("/sys/bus/pci/devices", e.Name())
-		class := strings.ToLower(strings.TrimSpace(readPCI(filepath.Join(base, "class"))))
-		// class is "0x030000" for VGA, "0x030200" for 3D, "0x038000" for other display.
-		if !strings.HasPrefix(class, "0x03") {
-			continue
-		}
-		id := pciID{
-			vendor: normPCI(readPCI(filepath.Join(base, "vendor"))),
-			device: normPCI(readPCI(filepath.Join(base, "device"))),
-		}
-		if id.vendor == "" || id.device == "" {
-			continue
-		}
-		if _, ok := seenID[id]; ok {
-			continue
-		}
-		seenID[id] = struct{}{}
-		found = append(found, id)
-	}
-	if len(found) == 0 {
-		return "", true
-	}
-
-	names := lookupPCINames(found)
-	if names == nil {
-		// sysfs saw a GPU but we have no pci.ids to name it. Let lspci try.
-		return "", false
-	}
-	var out []string
-	seen := map[string]struct{}{}
-	for _, id := range found {
-		name := names[id]
-		if name == "" {
-			continue
-		}
-		name = normalizeGPUName(name)
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		out = append(out, name)
-	}
-	return strings.Join(out, ", "), true
+func getWindowsGPU() string {
+	out := utils.RunCommand("reg.exe", "query", `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`, "/s")
+	return formatWindowsGPUs(out)
 }
 
-func readPCI(path string) string {
-	b, err := os.ReadFile(path)
+func formatWindowsGPUs(out string) string {
+	items := parseWindowsGPUs(out)
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		names = append(names, item.name)
+	}
+	keep := map[string]bool{}
+	for _, name := range preferRealGPUs(names) {
+		keep[name] = true
+	}
+	var lines []string
+	seen := map[string]bool{}
+	for _, item := range items {
+		if !keep[item.name] || seen[item.name] {
+			continue
+		}
+		seen[item.name] = true
+		lines = append(lines, formatWindowsGPULine(item.name, item.mem))
+	}
+	return strings.Join(lines, "\n")
+}
+
+type windowsGPU struct {
+	name string
+	mem  uint64
+}
+
+func parseWindowsGPUs(out string) []windowsGPU {
+	var items []windowsGPU
+	var cur *windowsGPU
+	var pending uint64
+	flush := func() {
+		if cur != nil && cur.name != "" {
+			items = append(items, *cur)
+		}
+		cur = nil
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "HKEY_") {
+			flush()
+			pending = 0
+			continue
+		}
+		if name := sectionValue(line, "DriverDesc"); name != "" {
+			flush()
+			cur = &windowsGPU{name: name, mem: pending}
+			pending = 0
+			continue
+		}
+		mem := regUint64(sectionValue(line, "HardwareInformation.qwMemorySize"))
+		if mem == 0 {
+			mem = regUint64(sectionValue(line, "HardwareInformation.MemorySize"))
+		}
+		if mem == 0 {
+			continue
+		}
+		if cur != nil && cur.mem == 0 {
+			cur.mem = mem
+		} else if cur == nil {
+			pending = mem
+		}
+	}
+	flush()
+	return items
+}
+
+func sectionValue(section, name string) string {
+	for _, line := range strings.Split(section, "\n") {
+		fields := strings.Fields(line)
+		reg := -1
+		for i, field := range fields {
+			if strings.HasPrefix(field, "REG_") {
+				reg = i
+				break
+			}
+		}
+		if reg <= 0 || reg+1 >= len(fields) {
+			continue
+		}
+		if strings.Join(fields[:reg], " ") == name {
+			return strings.Join(fields[reg+1:], " ")
+		}
+	}
+	return ""
+}
+
+func regUint64(s string) uint64 {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	base := 10
+	if strings.HasPrefix(strings.ToLower(s), "0x") {
+		s = s[2:]
+		base = 16
+	}
+	n, err := strconv.ParseUint(s, base, 64)
 	if err != nil {
+		return 0
+	}
+	return n
+}
+
+func formatWindowsGPULine(name string, mem uint64) string {
+	kind := windowsGPUKind(name)
+	if kind == "Virtual" {
+		return name
+	}
+	line := name
+	if mem > 0 {
+		line += " (" + formatGPUMem(mem) + ")"
+	}
+	if kind != "" {
+		line += " [" + kind + "]"
+	}
+	return line
+}
+
+func windowsGPUKind(name string) string {
+	low := strings.ToLower(name)
+	switch {
+	case strings.Contains(low, "virtual"), strings.Contains(low, "mumu"),
+		strings.Contains(low, "basic display"), strings.Contains(low, "remote display"),
+		strings.Contains(low, "indirect"):
+		return "Virtual"
+	case strings.Contains(low, "arc"):
+		return "Discrete"
+	case strings.Contains(low, "intel"):
+		return "Integrated"
+	case strings.Contains(low, "nvidia"), strings.Contains(low, "geforce"),
+		strings.Contains(low, "quadro"), strings.Contains(low, "radeon"),
+		strings.Contains(low, "amd"):
+		return "Discrete"
+	default:
 		return ""
 	}
-	return string(b)
 }
 
-func normPCI(id string) string {
-	id = strings.ToLower(strings.TrimSpace(id))
-	id = strings.TrimPrefix(id, "0x")
-	if len(id) > 4 {
-		id = id[len(id)-4:]
+func formatGPUMem(n uint64) string {
+	const giB = 1024 * 1024 * 1024
+	const miB = 1024 * 1024
+	if n >= giB {
+		return fmt.Sprintf("%.2f GiB", float64(n)/float64(giB))
 	}
-	return id
+	if n >= miB {
+		return fmt.Sprintf("%.2f MiB", float64(n)/float64(miB))
+	}
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d KiB", n/1024)
 }
 
-type pciID struct {
-	vendor string
-	device string
-}
-
-func lookupPCINames(ids []pciID) map[pciID]string {
-	needed := map[string]map[string]struct{}{}
-	for _, id := range ids {
-		if needed[id.vendor] == nil {
-			needed[id.vendor] = map[string]struct{}{}
-		}
-		needed[id.vendor][id.device] = struct{}{}
-	}
-
-	var f *os.File
-	for _, path := range []string{
-		"/usr/share/hwdata/pci.ids",
-		"/usr/share/misc/pci.ids",
-		"/usr/share/pci.ids",
-	} {
-		opened, err := os.Open(path)
-		if err == nil {
-			f = opened
-			break
-		}
-	}
-	if f == nil {
-		return nil
-	}
-	defer f.Close()
-
-	names := map[pciID]string{}
-	sc := bufio.NewScanner(f)
-	// pci.ids lines are long but bounded. Raise the default 64K just in case.
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	var vendorID, vendorName string
-	for sc.Scan() {
-		line := sc.Text()
-		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "\t\t") {
+func preferRealGPUs(gpus []string) []string {
+	var real []string
+	for _, gpu := range gpus {
+		low := strings.ToLower(gpu)
+		if strings.Contains(low, "microsoft basic display") || strings.Contains(low, "microsoft remote display") {
 			continue
 		}
-		if strings.HasPrefix(line, "\t") {
-			if vendorID == "" {
-				continue
-			}
-			if _, wantVendor := needed[vendorID]; !wantVendor {
-				continue
-			}
-			rest := line[1:]
-			if len(rest) < 4 {
-				continue
-			}
-			devID := strings.ToLower(rest[:4])
-			if _, want := needed[vendorID][devID]; !want {
-				continue
-			}
-			devName := strings.TrimSpace(rest[4:])
-			names[pciID{vendorID, devID}] = vendorName + " " + devName
-			continue
-		}
-		if len(line) < 4 {
-			continue
-		}
-		vendorID = strings.ToLower(line[:4])
-		if _, want := needed[vendorID]; want {
-			vendorName = strings.TrimSpace(line[4:])
-		} else {
-			vendorID = ""
-			vendorName = ""
-		}
+		real = append(real, gpu)
 	}
-	return names
-}
-
-func normalizeGPUName(raw string) string {
-	gpu := raw
-	switch {
-	case strings.Contains(gpu, "Advanced") || strings.Contains(gpu, "AMD") || strings.Contains(gpu, "ATI"):
-		brand := "AMD"
-		if strings.Contains(gpu, "AMD") && strings.Contains(gpu, "ATI") {
-			brand = "AMD ATI"
-		} else if strings.Contains(gpu, "ATI") && !strings.Contains(gpu, "AMD") {
-			brand = "ATI"
-		}
-		gpu = strings.ReplaceAll(gpu, "[AMD/ATI]", "")
-		gpu = strings.ReplaceAll(gpu, "[AMD]", "")
-		gpu = strings.ReplaceAll(gpu, "Advanced Micro Devices, Inc.", "")
-		if idx := strings.Index(gpu, "["); idx != -1 {
-			gpu = gpu[idx+1:]
-			if end := strings.Index(gpu, "]"); end != -1 {
-				gpu = gpu[:end]
-			}
-		}
-		gpu = brand + " " + strings.TrimSpace(gpu)
-	case strings.Contains(gpu, "NVIDIA"):
-		if idx := strings.Index(gpu, "["); idx != -1 {
-			gpu = gpu[idx+1:]
-			if end := strings.Index(gpu, "]"); end != -1 {
-				gpu = gpu[:end]
-			}
-		}
-		gpu = "NVIDIA " + strings.TrimSpace(gpu)
-	case strings.Contains(gpu, "Intel"):
-		if idx := strings.Index(gpu, "Intel"); idx != -1 {
-			gpu = gpu[idx:]
-		}
-		gpu = strings.ReplaceAll(gpu, "(R)", "")
-		gpu = strings.ReplaceAll(gpu, "Corporation", "")
-		gpu = strings.ReplaceAll(gpu, "Integrated Graphics Controller", "")
-		if idx := strings.Index(gpu, "("); idx != -1 {
-			gpu = gpu[:idx]
-		}
-		gpu = strings.TrimSpace(gpu)
-		if gpu == "" || gpu == "Intel" {
-			gpu = "Intel Integrated Graphics"
-		}
-	case strings.Contains(gpu, "VirtualBox"):
-		gpu = "VirtualBox Graphics Adapter"
-	default:
-		return strings.TrimSpace(raw)
+	if len(real) > 0 {
+		return real
 	}
-	return strings.Join(strings.Fields(gpu), " ")
-}
-
-func getWindowsGPU() string {
-	out := utils.RunCommand("wmic", "path", "Win32_VideoController", "get", "caption")
-	var gpus []string
-	for _, line := range strings.Split(out, "\n") {
-		line = utils.Trim(line)
-		if line == "" || strings.Contains(line, "Caption") {
-			continue
-		}
-		gpus = append(gpus, line)
-	}
-	return strings.Join(gpus, ", ")
+	return gpus
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -12,11 +13,10 @@ import (
 )
 
 var (
-	deOnce    sync.Once
-	de        string
-	deVersion string
-	wmOnce    sync.Once
-	wm        string
+	deOnce sync.Once
+	de     string
+	wmOnce sync.Once
+	wm     string
 
 	desktopOnce   sync.Once
 	desktopCached string
@@ -54,16 +54,16 @@ func detectDesktopEnvironment() string {
 	return desktopCached
 }
 
-func GetDE(osName, distro, kernel_name string) string {
+func GetDE(osName, distro, kernel_name, showVersion string) string {
 	deOnce.Do(func() {
-		de = detectDE(osName, distro, kernel_name)
+		de = detectDE(osName, distro, kernel_name, showVersion)
 	})
 	return de
 }
 
-func detectDE(osName, distro, kernel_name string) string {
+func detectDE(osName, distro, kernel_name, showVersion string) string {
 	switch osName {
-	case cli.MacOSX, cli.MacOS:
+	case cli.MacOSX, cli.MacOS, cli.Darwin:
 		de = "Aqua"
 
 	case cli.RavynOS:
@@ -99,6 +99,27 @@ func detectDE(osName, distro, kernel_name string) string {
 		}
 
 	default:
+		procs := ""
+		if names, ok := utils.ProcessNames(); ok {
+			procs = strings.Join(names, "\n")
+		} else {
+			procs = utils.RunCommand("ps", "-e", "-o", "comm=")
+		}
+		switch {
+		case strings.Contains(procs, "xfce4-session"):
+			de = "Xfce"
+		case strings.Contains(procs, "gnome-shell"):
+			de = "GNOME"
+		case strings.Contains(procs, "plasmashell"):
+			de = "KDE"
+		case strings.Contains(procs, "cinnamon"):
+			de = "Cinnamon"
+		case strings.Contains(procs, "mate-session"):
+			de = "MATE"
+		case strings.Contains(procs, "lxqt-session"):
+			de = "LXQt"
+		}
+
 		desktopSession := os.Getenv("DESKTOP_SESSION")
 		xdgCurrent := os.Getenv("XDG_CURRENT_DESKTOP")
 
@@ -176,8 +197,9 @@ func detectDE(osName, distro, kernel_name string) string {
 	}
 
 	// Add version info if available
-	if deVersion == utils.ON && de != "" {
+	if showVersion == utils.ON && de != "" {
 		deVer, kfVer, qtVer := getDEVersion(de)
+		deVer = shortVersion(deVer)
 		if deVer != "" {
 			if strings.HasPrefix(de, "Plasma") {
 				de = fmt.Sprintf("%s %s [KF %s] [Qt %s]", de, deVer, kfVer, qtVer)
@@ -187,12 +209,29 @@ func detectDE(osName, distro, kernel_name string) string {
 		}
 	}
 
-	// Add session type (X11 / Wayland)
-	if st := os.Getenv("XDG_SESSION_TYPE"); st != "" {
-		de += fmt.Sprintf(" (%s)", st)
+	if osName != cli.Windows && de != "" && !strings.Contains(de, "(") {
+		switch {
+		case os.Getenv("WAYLAND_DISPLAY") != "":
+			de += " (Wayland)"
+		case os.Getenv("DISPLAY") != "" && os.Getenv("DISPLAY") != "wayland":
+			if os.Getenv("XDG_SESSION_TYPE") != "tty" {
+				de += " (X11)"
+			}
+		}
 	}
 
 	return de
+}
+
+func shortVersion(s string) string {
+	s = strings.TrimSpace(strings.Split(s, "\n")[0])
+	if s == "" {
+		return ""
+	}
+	if m := regexp.MustCompile(`\d+\.\d+(?:\.\d+)?`).FindString(s); m != "" {
+		return m
+	}
+	return s
 }
 
 func getDEVersion(name string) (string, string, string) {

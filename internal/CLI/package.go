@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,65 +17,110 @@ type PkgInfo struct {
 	Count   int
 }
 
-type pkgProbe struct {
-	name string
-	fn   func() int
+// PackageConfig selects how package counts are gathered and printed.
+type PackageConfig struct {
+	Managers string
+	Separate bool
+	Minimal  bool
 }
 
-// DetectPackages counts installed packages by reading each manager's
-// database directly. fastfetch does the same: a directory listing or a
-// status file is milliseconds, while `pip freeze`, `rpm -qa`, `npm root`
-// and `cargo install --list` each start a whole runtime.
-func DetectPackages(osname string) string {
-	probes := []pkgProbe{
-		{"pipx", countPipx},
-		{"pip", countPip},
-		{"cargo", countCargo},
-		{"npm", countNpm},
-		{"pnpm", countPnpm},
+// DetectPackages counts installed packages from each manager's files.
+// Spawning pip, rpm, npm, or cargo is the slow path fastfetch avoids.
+func DetectPackages(osname string, cfg PackageConfig) string {
+	if cfg.Managers == "" {
+		cfg.Managers = utils.ON
+	}
+	type probe struct {
+		name string
+		fn   func() int
+	}
+	var probes []probe
+	add := func(name string, fn func() int) {
+		probes = append(probes, probe{name, fn})
+	}
+
+	if !cfg.Minimal {
+		add("pipx", countPipx)
+		add("pip", countPip)
+		add("cargo", func() int {
+			n, ok := countCargoInstalls()
+			if !ok {
+				return 0
+			}
+			return n
+		})
+		add("npm", countNpm)
+		add("pnpm", countPnpm)
 	}
 
 	switch osname {
 	case Linux:
-		probes = append(probes,
-			pkgProbe{"dpkg", countDpkg},
-			pkgProbe{"pacman", countPacman},
-			pkgProbe{"apk", countApk},
-			pkgProbe{"rpm", countRpm},
-			pkgProbe{"flatpak", countFlatpak},
-			pkgProbe{"snap", countSnap},
-			pkgProbe{"brew", countBrew},
-		)
+		add("dpkg", countDpkg)
+		add("pacman", countPacman)
+		add("apk", countApkOrDB)
+		add("rpm", countRpm)
+		if cfg.Separate {
+			add("flatpak-system", func() int { return countDirs("/var/lib/flatpak/app") })
+			add("flatpak-user", countFlatpakUser)
+		} else {
+			add("flatpak", countFlatpak)
+		}
+		add("snap", countSnap)
+		add("brew", countBrew)
+		add("opkg", countOpkg)
+		add("emerge", countEmerge)
+		add("xbps", countXbps)
+		add("slackpkg", countSlack)
+		add("kiss", countKiss)
+		add("eopkg", countEopkg)
+		add("linglong", countLinglong)
+		add("guix", countGuix)
+		add("nix", countNix)
+		add("conda", countConda)
+		add("pkgsrc", func() int { return countDirs("/usr/pkg/pkgdb") })
+		add("pacstall", func() int { return countDirs("/var/lib/pacstall/metadata") })
+		add("paludis", func() int { return countNestedDirs("/var/db/paludis/repositories") })
+		add("tazpkg", func() int { return countDirs("/var/lib/tazpkg/installed") })
+		add("sorcery", func() int { return countFiles("/var/state/sorcery/packages") })
+		add("cards", func() int { return countFiles("/var/lib/pkg/db") })
+		add("scratch", func() int { return countDirs("/var/lib/scratchpkg/db") })
+		add("ipkg", func() int {
+			return countPrefixedLines([]string{"/usr/lib/ipkg/status", "/var/lib/ipkg/status"}, "Package:")
+		})
+		add("moss", func() int { return countDirs("/var/db/moss/pkgs") })
+		if home := os.Getenv("HOME"); home != "" {
+			amHome := home
+			add("am", func() int { return countDirs(filepath.Join(amHome, ".local/share/am")) })
+		}
+	case FreeBSD, DragonFly, BSD, "MidnightBSD", "HardenedBSD", "GhostBSD", "NomadBSD":
+		add("pkg", countFreeBSDPkg)
+	case OpenBSD:
+		add("pkg_add", func() int { return countDirs("/var/db/pkg") })
+	case NetBSD:
+		add("pkgin", func() int { return countDirs("/usr/pkg/pkgdb") })
+	case Haiku:
+		add("pkgman", func() int { return countSuffix("/boot/system/packages", ".hpkg") })
+	case Solaris, illumos:
+		add("pkg", func() int { return countDirs("/var/sadm/pkg") })
+	case MINIX:
+		add("pkgin", func() int { return countDirs("/usr/pkg/pkgdb") })
 	case Darwin:
-		probes = append(probes,
-			pkgProbe{"brew", func() int { return countDirs("/usr/local/Cellar") }},
-			pkgProbe{"macports", func() int {
-				if !utils.CommandExists("port") {
-					return 0
-				}
-				return utils.GetPkgCount("port", "installed")
-			}},
-		)
-	case Windows:
-		probes = append(probes,
-			pkgProbe{"choco", countChoco},
-			pkgProbe{"winget", func() int {
-				if !utils.CommandExists("winget") {
-					return 0
-				}
-				return utils.GetPkgCount("winget", "list", "--accept-source-agreements")
-			}},
-		)
+		add("brew", countBrew)
+		add("macports", countMacports)
+	default:
+		if isBSDFamily(osname) {
+			add("pkg", countFreeBSDPkg)
+		}
 	}
 
 	counts := make([]int, len(probes))
 	var wg sync.WaitGroup
-	for i, p := range probes {
+	for i := range probes {
 		wg.Add(1)
-		go func(i int, fn func() int) {
+		go func(i int) {
 			defer wg.Done()
-			counts[i] = fn()
-		}(i, p.fn)
+			counts[i] = probes[i].fn()
+		}(i)
 	}
 	wg.Wait()
 
@@ -86,28 +130,59 @@ func DetectPackages(osname string) string {
 			managers = append(managers, PkgInfo{p.name, counts[i]})
 		}
 	}
-	if len(managers) == 0 {
-		return "No packages found"
+	if osname == Windows {
+		addWindowsPackages(func(name string, n int) {
+			if n > 0 {
+				managers = append(managers, PkgInfo{name, n})
+			}
+		})
 	}
-	res := make([]string, 0, len(managers))
+
+	total := 0
 	for _, m := range managers {
-		res = append(res, fmt.Sprintf("%d (%s)", m.Count, m.Manager))
+		total += m.Count
 	}
-	return strings.Join(res, ", ")
+	if len(managers) == 0 || total == 0 {
+		return ""
+	}
+	switch cfg.Managers {
+	case utils.OFF:
+		return strconv.Itoa(total)
+	case "tiny":
+		names := make([]string, 0, len(managers))
+		for _, m := range managers {
+			names = append(names, m.Manager)
+		}
+		return fmt.Sprintf("%d (%s)", total, strings.Join(names, ", "))
+	default:
+		res := make([]string, 0, len(managers))
+		for _, m := range managers {
+			res = append(res, fmt.Sprintf("%d (%s)", m.Count, m.Manager))
+		}
+		return strings.Join(res, ", ")
+	}
 }
 
-func countDirs(path string) int {
-	entries, err := os.ReadDir(path)
-	if err != nil {
+func countApkOrDB() int {
+	if n := countApk(); n > 0 {
+		return n
+	}
+	return countApkDB()
+}
+
+func countFlatpakUser() int {
+	data := os.Getenv("XDG_DATA_HOME")
+	if data == "" {
+		data = filepath.Join(os.Getenv("HOME"), ".local", "share")
+	}
+	return countDirs(filepath.Join(data, "flatpak", "app"))
+}
+
+func countMacports() int {
+	if !utils.CommandExists("port") {
 		return 0
 	}
-	n := 0
-	for _, e := range entries {
-		if e.IsDir() {
-			n++
-		}
-	}
-	return n
+	return utils.GetPkgCount("port", "installed")
 }
 
 func countDpkg() int {
@@ -246,14 +321,6 @@ func countBrew() int {
 	return countDirs(strings.TrimSpace(string(root)))
 }
 
-func countChoco() int {
-	pdata := os.Getenv("ProgramData")
-	if pdata == "" {
-		pdata = `C:\ProgramData`
-	}
-	return countDirs(filepath.Join(pdata, "chocolatey", "lib"))
-}
-
 func countPipx() int {
 	return countDirs(filepath.Join(os.Getenv("HOME"), ".local", "share", "pipx", "venvs"))
 }
@@ -286,30 +353,6 @@ func countNpm() int {
 		}
 	}
 	return 0
-}
-
-func countCargo() int {
-	home := os.Getenv("HOME")
-	if b, err := os.ReadFile(filepath.Join(home, ".cargo", ".crates2.json")); err == nil {
-		var doc struct {
-			Installs map[string]json.RawMessage `json:"installs"`
-		}
-		if json.Unmarshal(b, &doc) == nil {
-			return len(doc.Installs)
-		}
-	}
-	b, err := os.ReadFile(filepath.Join(home, ".cargo", ".crates.toml"))
-	if err != nil {
-		return 0
-	}
-	n := 0
-	for _, line := range strings.Split(string(b), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "\"") && strings.Contains(line, "=") {
-			n++
-		}
-	}
-	return n
 }
 
 // countPip counts distributions the way `pip freeze` does: one name per
