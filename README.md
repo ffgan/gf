@@ -2,10 +2,36 @@
 
 hyfetch 的旗帜配色、预设、`hyfetch.json` 和命令行参数可以直接用。没有 hyfetch 配置、也没传相关参数时，输出仍是原来的 neofetch 风格。
 
+## 安装
+
+[Releases](https://github.com/ffgan/gf/releases) 里按平台放了压缩包。Windows 是 `.zip`，其他系统是 `.tar.gz`。包里是可执行文件、`LICENSE` 和这份说明。同一个 release 里的 `gf_<version>_checksums.txt` 是 SHA-256。
+
+这些包用当前还在维护的最老 Go 版本构建，版本号写在 [`.go-version`](.go-version)（现在是 Go 1.26）。二进制沿用这个工具链的系统要求，例如 macOS 12，以及 Linux ppc64 的 ELFv1。
+
+目标来自该版本的 `go tool dist list`。32 位 ARM 会另外打出 ARMv5、ARMv6、ARMv7；MIPS 会同时打出 hardfloat 和 softfloat。文件名里的系统、架构和变体能直接对上：
+
+- `linux_armv6` 给树莓派 Zero 这种 ARMv6，`linux_armv5` 给更老的设备，一般的 32 位 ARM 用 `linux_armv7`。FreeBSD、NetBSD、OpenBSD、Plan 9 也是同样三份。
+- 没有硬件浮点的 MIPS 机器用 `*_softfloat`，有 FPU 的用 `*_hardfloat`。
+- `android_arm64` 不依赖 NDK，可以放进 Termux。`android_386`、`android_amd64`、`android_armv7` 链接 Android 系统 libc（API 21）。
+- `ios_arm64` 面向真机（最低 iOS 12），`ios_amd64` 面向 x86_64 模拟器。
+- `js_wasm` 和 `wasip1_wasm` 里的文件名是 `gf.wasm`。
+
+Go 1.26 已经去掉 `windows/arm`，也不再提供 `freebsd/riscv64`，所以发布里没有这两项。
+
 ## 构建
+
+需要 Go 1.26 或更新的版本。
 
 ```bash
 go build -o gf .
+```
+
+打出和 release 相同的一套包：
+
+```bash
+# android/386、android/amd64、android/arm 需要 ANDROID_NDK_HOME。
+# ios/arm64 只能在装了 Xcode 的 macOS 上编。
+VERSION=0.2.0 ANDROID_NDK_HOME=/opt/android-ndk bash scripts/build-release.sh
 ```
 
 ## 用法
