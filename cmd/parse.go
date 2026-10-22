@@ -13,7 +13,7 @@ import (
 
 // Version is reported by --version and -V. Releases override it with
 // -ldflags "-X github.com/ffgan/gf/cmd.Version=...".
-var Version = "0.2.0"
+var Version = "0.3.0"
 
 var (
 	showVersion bool
