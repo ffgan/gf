@@ -73,7 +73,12 @@ func assertInfo(t *testing.T, stdout string) {
 		t.Fatalf("second line should be the title underline:\n%s", stdout)
 	}
 
-	labels := []string{"OS", "Kernel", "Uptime", "Shell", "CPU", "Memory", "Disk"}
+	labels := []string{"OS", "Kernel", "Uptime"}
+	// Windows CI does not set SHELL, and GetShell stays empty without it.
+	if os.Getenv("SHELL") != "" {
+		labels = append(labels, "Shell")
+	}
+	labels = append(labels, "CPU", "Memory", "Disk")
 	pos := map[string]int{}
 	for i, line := range lines {
 		name, _, ok := strings.Cut(line, ": ")

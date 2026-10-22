@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -90,6 +91,36 @@ func diskLabel(mount, subtitle string) string {
 	default:
 		return "(" + mount + ")"
 	}
+}
+
+// parseDFPOSIX reads one POSIX `df -k -P` data line. Blocks are 1024 bytes.
+// The filesystem and mount point may contain spaces, so the three size
+// columns are taken from immediately before the capacity field.
+func parseDFPOSIX(line string) (used, total int64, percent int, err error) {
+	fields := strings.Fields(line)
+	pct := -1
+	for i, field := range fields {
+		if strings.HasSuffix(field, "%") {
+			pct = i
+			break
+		}
+	}
+	if pct < 3 {
+		return 0, 0, 0, fmt.Errorf("unexpected df columns")
+	}
+	total, err = strconv.ParseInt(fields[pct-3], 10, 64)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	used, err = strconv.ParseInt(fields[pct-2], 10, 64)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	percent, err = strconv.Atoi(strings.TrimSuffix(fields[pct], "%"))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return used, total, percent, nil
 }
 
 func humanBytes(n int64) string {
