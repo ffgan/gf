@@ -736,6 +736,10 @@ var (
 
 func windowsCurrentVersion() string {
 	windowsRegOnce.Do(func() {
+		if text := readWindowsCurrentVersion(); strings.TrimSpace(text) != "" {
+			windowsRegText = text
+			return
+		}
 		windowsRegText = utils.RunCommand("reg.exe", "query", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion`)
 	})
 	return windowsRegText

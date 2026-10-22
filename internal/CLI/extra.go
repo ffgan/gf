@@ -10,6 +10,11 @@ import (
 
 // GetUsers lists unique names from `who`.
 func GetUsers() string {
+	// Git bash's who does a name lookup and sits on the DNS timeout,
+	// which is about ten seconds on a domain-joined PC.
+	if names := platformUsers(); len(names) > 0 {
+		return strings.Join(names, ", ")
+	}
 	out := utils.RunCommand("who")
 	if out == "" {
 		return ""

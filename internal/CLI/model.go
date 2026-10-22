@@ -77,7 +77,11 @@ func GetModel(osName, kernelName, kernelMachine string) string {
 		}
 
 	case Windows:
-		model = windowsHardwareModel(utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\BIOS`))
+		text := readWindowsBIOS()
+		if text == "" {
+			text = utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\BIOS`)
+		}
+		model = windowsHardwareModel(text)
 
 	case Solaris, illumos:
 		model = utils.RunCommand("prtconf", "-b")

@@ -347,16 +347,32 @@ func getCPUSolaris(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 }
 
 func getCPUWindows(info *CPUInfo) (*CPUInfo, error) {
-	proc := utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0`)
-	info.Name = regValue(proc, "ProcessorNameString")
+	const cpu0 = `HARDWARE\DESCRIPTION\System\CentralProcessor\0`
+	const cpus = `HARDWARE\DESCRIPTION\System\CentralProcessor`
+	name, ok := utils.RegString(utils.HKLM, cpu0, "ProcessorNameString")
+	if !ok || name == "" {
+		proc := utils.RunCommand("reg.exe", "query", `HKLM\`+cpu0)
+		name = regValue(proc, "ProcessorNameString")
+		if mhz, err := strconv.Atoi(regNumber(regValue(proc, "~MHz"))); err == nil {
+			info.Speed = mhz
+		}
+		list := utils.RunCommand("reg.exe", "query", `HKLM\`+cpus)
+		info.Cores = countRegSubkeys(list)
+	} else {
+		info.Name = name
+		if mhz, ok := utils.RegUint(utils.HKLM, cpu0, "~MHz"); ok {
+			info.Speed = int(mhz)
+		}
+		if subs, ok := utils.RegSubkeys(utils.HKLM, cpus); ok {
+			info.Cores = len(subs)
+		}
+	}
+	if info.Name == "" {
+		info.Name = name
+	}
 	if info.Name == "" {
 		return nil, fmt.Errorf("cpu name not in the registry")
 	}
-	if mhz, err := strconv.Atoi(regNumber(regValue(proc, "~MHz"))); err == nil {
-		info.Speed = mhz
-	}
-	list := utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor`)
-	info.Cores = countRegSubkeys(list)
 	info.CoreLabel = windowsCoreLabel()
 	return info, nil
 }

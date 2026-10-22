@@ -15,6 +15,12 @@ import (
 // LocalIP returns the IPv4 address of the requested interface.
 // "auto" follows the default route, then the first global address.
 func LocalIP(ifaceName string) string {
+	// Windows net.Interface* calls GetAdaptersAddresses with gateway
+	// data. That walk is several seconds on machines with virtual NICs,
+	// and LocalIP used to do it twice.
+	if text, ok := platformLocalIP(ifaceName); ok {
+		return text
+	}
 	ifaceName = strings.Trim(ifaceName, "() '\"")
 	name := ifaceName
 	if name == "" || name == "auto" {
@@ -128,6 +134,21 @@ func firstGlobalCIDR() (string, string) {
 		}
 	}
 	return "", ""
+}
+
+// ipv4Prefix formats a MIB_IPADDRROW address and mask. Windows stores
+// both DWORDs in network byte order.
+func ipv4Prefix(addr, mask uint32) string {
+	ip := net.IPv4(byte(addr), byte(addr>>8), byte(addr>>16), byte(addr>>24)).To4()
+	if ip == nil || ip.IsLoopback() || ip.IsUnspecified() {
+		return ""
+	}
+	m := net.IPv4Mask(byte(mask), byte(mask>>8), byte(mask>>16), byte(mask>>24))
+	ones, bits := m.Size()
+	if bits != 32 || ones <= 0 {
+		return ip.String()
+	}
+	return fmt.Sprintf("%s/%d", ip, ones)
 }
 
 func addrCIDR(addr net.Addr) string {

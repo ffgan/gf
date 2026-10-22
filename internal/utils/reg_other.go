@@ -22,3 +22,11 @@ func RegKeyExists(root uintptr, path string) bool {
 func RegUint(root uintptr, path, name string) (uint32, bool) {
 	return 0, false
 }
+
+func RegUint64(root uintptr, path, name string) (uint64, bool) {
+	return 0, false
+}
+
+func RegSubkeys(root uintptr, path string) ([]string, bool) {
+	return nil, false
+}

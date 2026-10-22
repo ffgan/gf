@@ -12,3 +12,7 @@ func formatLocalIP(name, cidr string) string {
 func platformRouteIface() string {
 	return ""
 }
+
+func platformLocalIP(string) (string, bool) {
+	return "", false
+}
