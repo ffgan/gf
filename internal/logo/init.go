@@ -2077,13 +2077,8 @@ func init() {
 
 	r.Insert("Astra Linux", DistroWithColor{
 		FileName: "Astra",
-		// TODO: need to fix
-		//  if [[ $ascii_distro == *"ALCE"* ]]; then
-		// set_colors 160 231
-		// else
-		// set_colors 32 231
-		// fi
-		Colors: []int{160, 231},
+		// ALSE palette. Resolve switches to 160 231 when the name contains ALCE.
+		Colors: []int{32, 231},
 	})
 
 	r.Insert("sabotage", DistroWithColor{
@@ -2276,17 +2271,17 @@ func init() {
 	})
 
 	r.Insert("openSUSE", DistroWithColor{
-		FileName: "SUSE",
+		FileName: "openSUSE",
 		Colors:   []int{2, 7},
 	})
 
 	r.Insert("open SUSE", DistroWithColor{
-		FileName: "SUSE",
+		FileName: "openSUSE",
 		Colors:   []int{2, 7},
 	})
 
 	r.Insert("SUSE", DistroWithColor{
-		FileName: "SUSE",
+		FileName: "openSUSE",
 		Colors:   []int{2, 7},
 	})
 
@@ -2551,8 +2546,8 @@ func init() {
 		Colors:   []int{4, 7},
 	})
 
-	r.Insert("KrassOS", DistroWithColor{
-		FileName: "Krass",
+	r.Insert("Krass", DistroWithColor{
+		FileName: "KrassOS",
 		Colors:   []int{4, 7},
 	})
 
@@ -2619,9 +2614,61 @@ func init() {
 		Colors:   []int{3, 7},
 	})
 
+	// Distros and historical spellings from neofetch's ascii catalog.
+	r.Insert("Armada", DistroWithColor{FileName: "Armada", RawColors: []string{"fg"}})
+	r.Insert("Codex Linux", DistroWithColor{FileName: "Codex", RawColors: []string{"fg"}})
+	r.Insert("Codex", DistroWithColor{FileName: "Codex", RawColors: []string{"fg"}})
+	r.Insert("Fiwix", DistroWithColor{FileName: "Fiwix", Colors: []int{45, 45, 18}})
+	r.Insert("FiwixOS", DistroWithColor{FileName: "Fiwix", Colors: []int{45, 45, 18}})
+	r.Insert("HarmonyOS", DistroWithColor{FileName: "HarmonyOS", Colors: []int{7, 4}})
+	r.Insert("Imaginary", DistroWithColor{FileName: "Imaginary", Colors: []int{5}})
+	r.Insert("Imaginary Linux", DistroWithColor{FileName: "Imaginary", Colors: []int{5}})
+	r.Insert("Linux Imaginary", DistroWithColor{FileName: "Imaginary", Colors: []int{5}})
+	r.Insert("LinuxImaginary", DistroWithColor{FileName: "Imaginary", Colors: []int{5}})
+	r.Insert("MidOS", DistroWithColor{FileName: "MidOS", Colors: []int{8}})
+	r.Insert("MidOS_old", DistroWithColor{FileName: "MidOS_old", Colors: []int{8, 7}})
+	r.Insert("NixOwOS", DistroWithColor{FileName: "NixOwOS", RawColors: []string{"#5277c3", "#7ebae4", "#df90af", "#2d789e", "#5f92d3"}})
+	r.Insert("Keenetic", DistroWithColor{FileName: "Keenetic", Colors: []int{4, 7}})
+	r.Insert("QNX", DistroWithColor{FileName: "QNX", Colors: []int{1}})
+	r.Insert("Blackberry 10", DistroWithColor{FileName: "QNX", Colors: []int{1}})
+	r.Insert("OpenSolaris", DistroWithColor{FileName: "OpenSolaris", Colors: []int{4, 6, 2, 7}})
+	r.Insert("TUXEDO OS", DistroWithColor{FileName: "Tuxedo", Colors: []int{7, 1}})
+	r.Insert("Tuxedo OS", DistroWithColor{FileName: "Tuxedo", Colors: []int{7, 1}})
+	r.Insert("Tuxedo", DistroWithColor{FileName: "Tuxedo", Colors: []int{7, 1}})
+	r.Insert("Vylen", DistroWithColor{FileName: "Vylen", Colors: []int{2}})
+	r.Insert("vylen_small", DistroWithColor{FileName: "vylen_small", Colors: []int{2}})
+	r.Insert("Zirconium", DistroWithColor{FileName: "Zirconium", Colors: []int{4, 6}})
+	r.Insert("AOSC OS/Retro", DistroWithColor{FileName: "AOSC_Retro", Colors: []int{4, 7, 1, 3}})
+	r.Insert("mac_small", DistroWithColor{FileName: "mac_small", Colors: []int{2, 3, 1, 5, 4}})
+	r.Insert("Gloire", DistroWithColor{FileName: "Gloire", Colors: []int{5, 7, 0}})
+	r.Insert("whiite-linux", DistroWithColor{FileName: "whiite-linux", Colors: []int{6, 7}})
+	r.Insert("wii-linux-ngx", DistroWithColor{FileName: "whiite-linux", Colors: []int{6, 7}})
+	r.Insert("gc-linux", DistroWithColor{FileName: "whiite-linux", Colors: []int{6, 7}})
+	r.Insert("Windows 11", DistroWithColor{FileName: "windows11", Colors: []int{4, 6}})
+	r.Insert("windows11", DistroWithColor{FileName: "windows11", Colors: []int{4, 6}})
+	r.Insert("Windows 10", DistroWithColor{FileName: "windows10", Colors: []int{6, 7}})
+	r.Insert("windows10", DistroWithColor{FileName: "windows10", Colors: []int{6, 7}})
+	r.Insert("Windows 8", DistroWithColor{FileName: "windows10", Colors: []int{6, 7}})
+	r.Insert("Windows 8.1", DistroWithColor{FileName: "windows10", Colors: []int{6, 7}})
+	r.Insert("windows8", DistroWithColor{FileName: "windows10", Colors: []int{6, 7}})
+	r.Insert("Windows 95", DistroWithColor{FileName: "Windows95", Colors: []int{6, 4, 3, 2, 1, 0}})
+	r.Insert("AlterLinux", DistroWithColor{FileName: "Alter", Colors: []int{6, 6}})
+	r.Insert("MX_Linux", DistroWithColor{FileName: "MX", Colors: []int{4, 6, 7}})
+	r.Insert("SereneLinux", DistroWithColor{FileName: "Serene", Colors: []int{6, 6}})
+	r.Insert("Windows7", DistroWithColor{FileName: "Windows", Colors: []int{1, 2, 4, 3}})
+	r.Insert("Mandrake", DistroWithColor{FileName: "Mandriva", Colors: []int{4, 3}})
+	r.Insert("DragonFlyBSD", DistroWithColor{FileName: "DragonFly", Colors: []int{1, 7, 3}})
+	r.Insert("Chrome OS", DistroWithColor{FileName: "Chrom", Colors: []int{2, 1, 3, 4, 7}})
+	r.Insert("Chromium OS", DistroWithColor{FileName: "Chrom", Colors: []int{2, 1, 3, 4, 7}})
+	r.Insert("iOS", DistroWithColor{FileName: "mac", Colors: []int{2, 3, 1, 1, 5, 4}})
+	r.Insert("iPhone OS", DistroWithColor{FileName: "mac", Colors: []int{2, 3, 1, 1, 5, 4}})
+	r.Insert("pfSense", DistroWithColor{FileName: "FreeBSD", Colors: []int{1, 7, 3}})
+
 }
 
 type DistroWithColor struct {
 	FileName string
 	Colors   []int
+	// RawColors overrides Colors for neofetch palettes that use "fg" or "#rrggbb".
+	RawColors []string
 }

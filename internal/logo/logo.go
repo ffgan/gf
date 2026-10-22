@@ -66,8 +66,7 @@ func SetAppearance(bold bool, asciiColors, textColors string) {
 
 // ApplyDistro loads the palette for a distro without printing artwork.
 func ApplyDistro(name string) {
-	dc := Resolve(name)
-	setColors(dc.Colors...)
+	applyPalette(Resolve(name))
 }
 
 func parseColorInts(spec string) []int {
@@ -132,8 +131,6 @@ var idAliases = map[string]string{
 	"openkylin":           "openKylin",
 	"openeuler":           "openEuler",
 	"euleros":             "openEuler",
-	"harmonyos":           "Android",
-	"openharmony":         "Android",
 	"hyperos":             "Android",
 	"anolis":              "CentOS",
 	"opencloudos":         "CentOS",
@@ -203,18 +200,56 @@ var idAliases = map[string]string{
 	"omnios":              "OmniOS",
 	"openindiana":         "OpenIndiana",
 	"smartos":             "SmartOS",
+	"harmonyos":           "HarmonyOS",
+	"openharmony":         "HarmonyOS",
+	"fiwix":               "Fiwix",
+	"fiwixos":             "Fiwix",
+	"qnx":                 "QNX",
+	"blackberry":          "Blackberry 10",
+	"tuxedo":              "Tuxedo",
+	"tuxedos":             "Tuxedo",
+	"opensolaris":         "OpenSolaris",
+	"midos":               "MidOS",
+	"zirconium":           "Zirconium",
+	"nixowos":             "NixOwOS",
+	"keenetic":            "Keenetic",
+	"vylen":               "Vylen",
+	"imaginary":           "Imaginary",
+	"armada":              "Armada",
+	"codex":               "Codex",
+	"gloire":              "Gloire",
+	"pfsense":             "FreeBSD",
+	"dragonflybsd":        "DragonFly",
+	"mandrake":            "Mandriva",
+	"ios":                 "iOS",
+	"iphone":              "iOS",
+	"chromiumos":          "Chrom",
+	"alterlinux":          "Alter",
+	"serenelinux":         "Serene",
+	"windows11":           "Windows 11",
+	"windows10":           "Windows 10",
+	"windows8":            "Windows 8",
+	"windows7":            "Windows",
+	"windows95":           "Windows95",
 }
 
 // Resolve finds the logo record for a distro name, ID, or pretty name.
 func Resolve(name string) DistroWithColor {
 	name = strings.TrimSpace(name)
-	if dc, ok := lookup(name); ok {
-		return dc
+	dc, ok := lookup(name)
+	if !ok {
+		if dc, ok = lookup("Linux"); !ok {
+			return DistroWithColor{FileName: "Linux", Colors: []int{8, 3}}
+		}
 	}
-	if dc, ok := lookup("Linux"); ok {
-		return dc
+	if dc.FileName == "Astra" {
+		if strings.Contains(strings.ToUpper(name), "ALCE") {
+			dc.Colors = []int{160, 231}
+		} else {
+			dc.Colors = []int{32, 231}
+		}
 	}
-	return DistroWithColor{FileName: "Linux", Colors: []int{8, 3}}
+	return dc
 }
 
 func lookup(name string) (DistroWithColor, bool) {
@@ -255,7 +290,27 @@ func lookup(name string) (DistroWithColor, bool) {
 			}
 		}
 	}
+	if key, ok := legacyLogoKey(name); ok {
+		if dc, ok := lookup(key); ok {
+			return dc, true
+		}
+	}
 	return DistroWithColor{}, false
+}
+
+// legacyLogoKey matches neofetch ascii patterns that are not a prefix of the name:
+// substring hits such as "on Windows 11", and a few glued historical spellings.
+func legacyLogoKey(name string) (string, bool) {
+	low := strings.ToLower(name)
+	switch {
+	case strings.Contains(low, "wii-linux-ngx"), strings.Contains(low, "whiite-linux"), strings.Contains(low, "gc-linux"):
+		return "whiite-linux", true
+	case strings.Contains(low, "[windows 11]"), strings.Contains(low, "on windows 11"):
+		return "Windows 11", true
+	case strings.Contains(low, "[windows 10]"), strings.Contains(low, "on windows 10"):
+		return "Windows 10", true
+	}
+	return "", false
 }
 
 func validPrefix(name, prefix string) bool {
@@ -266,12 +321,12 @@ func validPrefix(name, prefix string) bool {
 		return true
 	}
 	next := name[len(prefix)]
-	return next == ' ' || next == '-' || next == '_' || next == '/' || next == '('
+	return next == ' ' || next == '-' || next == '_' || next == '/' || next == '(' || next == '.'
 }
 
 func loadDistroASCII(ASCIIDistro string, ASCIIFiles embed.FS) {
 	dc := Resolve(ASCIIDistro)
-	setColors(dc.Colors...)
+	applyPalette(dc)
 
 	filename := "assets/" + dc.FileName
 	f, err := ASCIIFiles.Open(filename)
@@ -428,6 +483,14 @@ func color(input string) string {
 	}
 }
 
+func applyPalette(dc DistroWithColor) {
+	if len(dc.RawColors) > 0 && len(asciiColorOverride) == 0 {
+		setColorSlots(dc.RawColors)
+		return
+	}
+	setColors(dc.Colors...)
+}
+
 func setColors(argsInts ...int) {
 	nums := argsInts
 	if len(asciiColorOverride) > 0 {
@@ -437,7 +500,10 @@ func setColors(argsInts ...int) {
 	for i, n := range nums {
 		args[i] = strconv.Itoa(n)
 	}
+	setColorSlots(args)
+}
 
+func setColorSlots(args []string) {
 	slots := []*string{&c1, &c2, &c3, &c4, &c5, &c6}
 	for i, slot := range slots {
 		if i < len(args) {
