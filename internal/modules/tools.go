@@ -51,7 +51,10 @@ func Libc() string {
 	if commandExists("ldd") {
 		ldd = runCombined("ldd", "--version")
 	}
-	return ParseLibc(getconf, ldd)
+	if libc := ParseLibc(getconf, ldd); libc != "" {
+		return libc
+	}
+	return callPlatform(hostPlatform.libc)
 }
 
 // LoginManager follows the display-manager unit when systemd provides one.
@@ -76,7 +79,7 @@ func LoginManager() string {
 			return name
 		}
 	}
-	return ""
+	return callPlatform(hostPlatform.loginManager)
 }
 
 // Player is the active media player name.
@@ -100,14 +103,28 @@ func Player() string {
 			return joinLines(lines)
 		}
 	}
+	var names []string
+	for _, proc := range readProcs() {
+		names = append(names, proc.name)
+	}
+	return finish(playersFromNames(names), hostPlatform.player)
+}
+
+func playersFromNames(names []string) string {
 	known := map[string]string{
 		"spotify": "Spotify", "vlc": "VLC", "mpv": "mpv",
 		"rhythmbox": "Rhythmbox", "clementine": "Clementine",
 		"strawberry": "Strawberry", "cmus": "cmus", "elisa": "Elisa",
+		"music": "Music", "itunes": "iTunes",
 	}
 	var found []string
-	for _, proc := range readProcs() {
-		if label, ok := known[strings.ToLower(proc.name)]; ok {
+	for _, name := range names {
+		base := strings.ToLower(name)
+		if i := strings.LastIndexAny(base, `/\`); i >= 0 {
+			base = base[i+1:]
+		}
+		base = strings.TrimSuffix(base, ".exe")
+		if label, ok := known[base]; ok {
 			found = append(found, label)
 		}
 	}
