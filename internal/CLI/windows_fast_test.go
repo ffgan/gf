@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,6 +60,40 @@ func TestCountCargoInstalls(t *testing.T) {
 	n, ok := countCargoInstalls()
 	if !ok || n != 2 {
 		t.Fatalf("crates2 %d %v", n, ok)
+	}
+}
+
+func TestWindowsReleaseCode(t *testing.T) {
+	text := sampleCurrentVersion + "    DisplayVersion    REG_SZ    25H2\n"
+	if got := windowsDistroFromReg(text); got != "Windows 11 Pro (25H2)" {
+		t.Fatalf("distro %q", got)
+	}
+	if got := windowsDistroName(text, "Windows 11 专业版"); got != "Windows 11 专业版 (25H2)" {
+		t.Fatalf("branded %q", got)
+	}
+}
+
+func TestCoreLabel(t *testing.T) {
+	var buf []byte
+	entry := func(class byte) {
+		b := make([]byte, 48)
+		binary.LittleEndian.PutUint32(b[4:8], 48)
+		b[9] = class
+		binary.LittleEndian.PutUint16(b[30:32], 1)
+		binary.LittleEndian.PutUint64(b[32:40], 1)
+		buf = append(buf, b...)
+	}
+	for i := 0; i < 8; i++ {
+		entry(1)
+	}
+	for i := 0; i < 16; i++ {
+		entry(0)
+	}
+	if got := coreLabelFromBuffer(buf); got != "8+16" {
+		t.Fatalf("cores %q", got)
+	}
+	if coreLabelFromBuffer(buf[:48]) != "" {
+		t.Fatal("one class should stay a plain count")
 	}
 }
 

@@ -24,6 +24,9 @@ func GetDisk(report DiskReport) string {
 	if len(mounts) == 0 {
 		mounts = []string{"/"}
 	}
+	if text, ok := windowsDiskReport(mounts, report); ok {
+		return text
+	}
 	var lines []string
 	for _, mount := range mounts {
 		mount = localMount(mount)

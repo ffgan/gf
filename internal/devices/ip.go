@@ -2,6 +2,7 @@ package dev
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -15,15 +16,25 @@ import (
 // "auto" follows the default route, then the first global address.
 func LocalIP(ifaceName string) string {
 	ifaceName = strings.Trim(ifaceName, "() '\"")
-	if ifaceName == "" || ifaceName == "auto" {
-		ifaceName = defaultRouteIface()
-	}
-	if ifaceName != "" && ifaceName != "auto" {
-		if ip := ifaceIPv4(ifaceName); ip != "" {
-			return ip
+	name := ifaceName
+	if name == "" || name == "auto" {
+		name = defaultRouteIface()
+		if name == "" {
+			name = platformRouteIface()
 		}
 	}
-	return firstGlobalIPv4()
+	cidr := ""
+	if name != "" && name != "auto" {
+		cidr = ifaceCIDR(name)
+	}
+	if cidr == "" {
+		fallback, ip := firstGlobalCIDR()
+		cidr = ip
+		if name == "" || name == "auto" {
+			name = fallback
+		}
+	}
+	return formatLocalIP(name, cidr)
 }
 
 // PublicIP fetches the address from host, which defaults to ident.me.
@@ -80,7 +91,7 @@ func defaultRouteIface() string {
 	return best
 }
 
-func ifaceIPv4(name string) string {
+func ifaceCIDR(name string) string {
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
 		return ""
@@ -90,18 +101,17 @@ func ifaceIPv4(name string) string {
 		return ""
 	}
 	for _, addr := range addrs {
-		ip := addrIP(addr)
-		if ip != "" {
-			return ip
+		if cidr := addrCIDR(addr); cidr != "" {
+			return cidr
 		}
 	}
 	return ""
 }
 
-func firstGlobalIPv4() string {
+func firstGlobalCIDR() (string, string) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	for _, iface := range ifaces {
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
@@ -112,15 +122,15 @@ func firstGlobalIPv4() string {
 			continue
 		}
 		for _, addr := range addrs {
-			if ip := addrIP(addr); ip != "" {
-				return ip
+			if cidr := addrCIDR(addr); cidr != "" {
+				return iface.Name, cidr
 			}
 		}
 	}
-	return ""
+	return "", ""
 }
 
-func addrIP(addr net.Addr) string {
+func addrCIDR(addr net.Addr) string {
 	ipnet, ok := addr.(*net.IPNet)
 	if !ok || ipnet.IP == nil || ipnet.IP.IsLoopback() {
 		return ""
@@ -129,5 +139,9 @@ func addrIP(addr net.Addr) string {
 	if ip4 == nil {
 		return ""
 	}
-	return ip4.String()
+	ones, bits := ipnet.Mask.Size()
+	if bits != 32 || ones <= 0 {
+		return ip4.String()
+	}
+	return fmt.Sprintf("%s/%d", ip4, ones)
 }

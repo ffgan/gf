@@ -41,7 +41,11 @@ func getKernel(kc kernelconfig) string {
 		return getKernelRelease()
 
 	case Windows:
-		return windowsKernelVersion(windowsCurrentVersion())
+		ver := windowsKernelVersion(windowsCurrentVersion())
+		if ver == "" || kc.kernelShorthand == "tiny" {
+			return ver
+		}
+		return "WIN32_NT " + ver
 
 	case Solaris:
 		ver := getKernelRelease()

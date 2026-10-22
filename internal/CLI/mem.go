@@ -246,6 +246,70 @@ func getVmstatValue(column int) int64 {
 	return 0
 }
 
+func PrintSwap(osName string, showPercent bool) string {
+	var used, total int64
+	var err error
+	switch osName {
+	case Linux:
+		used, total, err = getSwapLinux()
+	case Windows:
+		used, total, err = getSwapWindows()
+	default:
+		return ""
+	}
+	if err != nil || total <= 0 {
+		return ""
+	}
+	return formatFlexiblePair(used, total, showPercent)
+}
+
+func getSwapLinux() (int64, int64, error) {
+	file, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer file.Close()
+	var total, free int64
+	sc := bufio.NewScanner(file)
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) < 2 {
+			continue
+		}
+		value, _ := strconv.ParseInt(fields[1], 10, 64)
+		switch strings.TrimSuffix(fields[0], ":") {
+		case "SwapTotal":
+			total = value
+		case "SwapFree":
+			free = value
+		}
+	}
+	if total <= 0 {
+		return 0, 0, fmt.Errorf("no swap")
+	}
+	return (total - free) * 1024, total * 1024, nil
+}
+
+func formatFlexiblePair(used, total int64, showPercent bool) string {
+	text := flexibleBytes(used) + " / " + flexibleBytes(total)
+	if showPercent && total > 0 {
+		text += fmt.Sprintf(" (%d%%)", used*100/total)
+	}
+	return text
+}
+
+func flexibleBytes(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+	const giB = 1024 * 1024 * 1024
+	const miB = 1024 * 1024
+	if n >= giB {
+		return fmt.Sprintf("%.2f GiB", float64(n)/float64(giB))
+	}
+	return fmt.Sprintf("%.2f MiB", float64(n)/float64(miB))
+}
+
 func formatMemory(usedKiB, totalKiB int64, percent int, config *MemoryConfig) string {
 	var label string
 	var divider int64 = 1

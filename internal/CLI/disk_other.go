@@ -14,6 +14,10 @@ func localMount(mount string) string {
 	return mount
 }
 
+func windowsDiskReport(mounts []string, report DiskReport) (string, bool) {
+	return "", false
+}
+
 func dfBytes(path string) (int64, int64, int, error) {
 	out, err := utils.CommandOutput("df", "-B1", "-P", path)
 	if err != nil {

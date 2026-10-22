@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -11,6 +12,9 @@ import (
 )
 
 func GetTheme() string {
+	if runtime.GOOS == "windows" {
+		return windowsTheme()
+	}
 	ctx := StyleContext{
 		Name:      "gtk-theme-name",
 		GSettings: "gtk-theme",

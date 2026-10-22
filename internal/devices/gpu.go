@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	cli "github.com/ffgan/gf/internal/CLI"
@@ -61,7 +62,7 @@ func filterGPUType(gpu, kind string) string {
 		return gpu
 	}
 	var keep []string
-	for _, part := range strings.Split(gpu, ", ") {
+	for _, part := range splitGPUList(gpu) {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
@@ -80,7 +81,28 @@ func filterGPUType(gpu, kind string) string {
 			keep = append(keep, part)
 		}
 	}
-	return strings.Join(keep, ", ")
+	return strings.Join(keep, "\n")
+}
+
+func splitGPUList(gpu string) []string {
+	var parts []string
+	for _, line := range strings.Split(gpu, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.Contains(line, "[") {
+			parts = append(parts, line)
+			continue
+		}
+		for _, part := range strings.Split(line, ", ") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				parts = append(parts, part)
+			}
+		}
+	}
+	return parts
 }
 
 func getLinuxGPU() string {
@@ -288,23 +310,161 @@ func parseSystemProfiler(data, key string) string {
 }
 
 func getWindowsGPU() string {
-	out := utils.RunCommand("reg.exe", "query", `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`, "/s", "/v", "DriverDesc")
+	out := utils.RunCommand("reg.exe", "query", `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`, "/s")
 	return formatWindowsGPUs(out)
 }
 
 func formatWindowsGPUs(out string) string {
-	var gpus []string
+	items := parseWindowsGPUs(out)
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		names = append(names, item.name)
+	}
+	keep := map[string]bool{}
+	for _, name := range preferRealGPUs(names) {
+		keep[name] = true
+	}
+	var lines []string
 	seen := map[string]bool{}
-	for _, name := range regAll(out, "DriverDesc") {
-		name = strings.TrimSpace(name)
-		if name == "" || seen[name] {
+	for _, item := range items {
+		if !keep[item.name] || seen[item.name] {
 			continue
 		}
-		seen[name] = true
-		gpus = append(gpus, name)
+		seen[item.name] = true
+		lines = append(lines, formatWindowsGPULine(item.name, item.mem))
 	}
-	gpus = preferRealGPUs(gpus)
-	return strings.Join(gpus, ", ")
+	return strings.Join(lines, "\n")
+}
+
+type windowsGPU struct {
+	name string
+	mem  uint64
+}
+
+func parseWindowsGPUs(out string) []windowsGPU {
+	var items []windowsGPU
+	var cur *windowsGPU
+	var pending uint64
+	flush := func() {
+		if cur != nil && cur.name != "" {
+			items = append(items, *cur)
+		}
+		cur = nil
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "HKEY_") {
+			flush()
+			pending = 0
+			continue
+		}
+		if name := sectionValue(line, "DriverDesc"); name != "" {
+			flush()
+			cur = &windowsGPU{name: name, mem: pending}
+			pending = 0
+			continue
+		}
+		mem := regUint64(sectionValue(line, "HardwareInformation.qwMemorySize"))
+		if mem == 0 {
+			mem = regUint64(sectionValue(line, "HardwareInformation.MemorySize"))
+		}
+		if mem == 0 {
+			continue
+		}
+		if cur != nil && cur.mem == 0 {
+			cur.mem = mem
+		} else if cur == nil {
+			pending = mem
+		}
+	}
+	flush()
+	return items
+}
+
+func sectionValue(section, name string) string {
+	for _, line := range strings.Split(section, "\n") {
+		fields := strings.Fields(line)
+		reg := -1
+		for i, field := range fields {
+			if strings.HasPrefix(field, "REG_") {
+				reg = i
+				break
+			}
+		}
+		if reg <= 0 || reg+1 >= len(fields) {
+			continue
+		}
+		if strings.Join(fields[:reg], " ") == name {
+			return strings.Join(fields[reg+1:], " ")
+		}
+	}
+	return ""
+}
+
+func regUint64(s string) uint64 {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	base := 10
+	if strings.HasPrefix(strings.ToLower(s), "0x") {
+		s = s[2:]
+		base = 16
+	}
+	n, err := strconv.ParseUint(s, base, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+func formatWindowsGPULine(name string, mem uint64) string {
+	kind := windowsGPUKind(name)
+	if kind == "Virtual" {
+		return name
+	}
+	line := name
+	if mem > 0 {
+		line += " (" + formatGPUMem(mem) + ")"
+	}
+	if kind != "" {
+		line += " [" + kind + "]"
+	}
+	return line
+}
+
+func windowsGPUKind(name string) string {
+	low := strings.ToLower(name)
+	switch {
+	case strings.Contains(low, "virtual"), strings.Contains(low, "mumu"),
+		strings.Contains(low, "basic display"), strings.Contains(low, "remote display"),
+		strings.Contains(low, "indirect"):
+		return "Virtual"
+	case strings.Contains(low, "arc"):
+		return "Discrete"
+	case strings.Contains(low, "intel"):
+		return "Integrated"
+	case strings.Contains(low, "nvidia"), strings.Contains(low, "geforce"),
+		strings.Contains(low, "quadro"), strings.Contains(low, "radeon"),
+		strings.Contains(low, "amd"):
+		return "Discrete"
+	default:
+		return ""
+	}
+}
+
+func formatGPUMem(n uint64) string {
+	const giB = 1024 * 1024 * 1024
+	const miB = 1024 * 1024
+	if n >= giB {
+		return fmt.Sprintf("%.2f GiB", float64(n)/float64(giB))
+	}
+	if n >= miB {
+		return fmt.Sprintf("%.2f MiB", float64(n)/float64(miB))
+	}
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d KiB", n/1024)
 }
 
 func preferRealGPUs(gpus []string) []string {
@@ -320,21 +480,4 @@ func preferRealGPUs(gpus []string) []string {
 		return real
 	}
 	return gpus
-}
-
-func regAll(out, name string) []string {
-	var vals []string
-	for _, line := range strings.Split(out, "\n") {
-		if !strings.Contains(line, name) || !strings.Contains(line, "REG_") {
-			continue
-		}
-		fields := strings.Fields(line)
-		for i, field := range fields {
-			if strings.HasPrefix(field, "REG_") && i+1 < len(fields) {
-				vals = append(vals, strings.Join(fields[i+1:], " "))
-				break
-			}
-		}
-	}
-	return vals
 }

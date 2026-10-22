@@ -126,6 +126,8 @@ func (h *hardware) field(name string) string {
 		return h.npu
 	case "memory":
 		return h.memory
+	case "swap":
+		return h.swap
 	case "network":
 		return h.network
 	case "bluetooth":
@@ -136,6 +138,8 @@ func (h *hardware) field(name string) string {
 		return h.term
 	case "term_font":
 		return h.term_font
+	case "font":
+		return h.font
 	case "theme":
 		return h.theme
 	case "icons":

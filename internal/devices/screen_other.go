@@ -2,6 +2,6 @@
 
 package dev
 
-func getResolutionWindows() string {
+func getResolutionWindows(refresh bool) string {
 	return ""
 }

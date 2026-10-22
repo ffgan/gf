@@ -14,9 +14,12 @@ func GetWM(osName, kernelName string) string {
 		return wm
 	}
 	if osName == cli.Windows {
-		// tasklist and ps walk every process. The desktop compositor
-		// on supported Windows is DWM.
-		wm = "DWM"
+		// Supported Windows composites with DWM. Reading dwm.exe's
+		// version avoids walking the process list.
+		wm = "Desktop Window Manager"
+		if ver := windowsWMVersion(); ver != "" {
+			wm += " " + ver
+		}
 		wmRun = true
 		return wm
 	}

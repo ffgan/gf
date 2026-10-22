@@ -3,6 +3,7 @@ package gui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -10,6 +11,9 @@ import (
 
 // GetWMTheme returns the window manager's own theme, separate from the GTK theme.
 func GetWMTheme(wm string) string {
+	if runtime.GOOS == "windows" {
+		return windowsWMTheme()
+	}
 	low := strings.ToLower(wm)
 	switch {
 	case strings.Contains(low, "xfwm"):

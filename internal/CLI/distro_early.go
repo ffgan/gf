@@ -742,7 +742,39 @@ func windowsCurrentVersion() string {
 }
 
 func windowsDistroFromReg(text string) string {
-	return windowsProduct(regValue(text, "ProductName"), regValue(text, "CurrentBuildNumber"))
+	return windowsDistroName(text, "")
+}
+
+func windowsReleaseCode(text string) string {
+	return firstNonEmpty(regValue(text, "DisplayVersion"), regValue(text, "CSDVersion"), regValue(text, "ReleaseId"))
+}
+
+// windowsDistroName builds the OS line. branded is the localized name from
+// winbrand when the machine has one; an empty string uses ProductName.
+func windowsDistroName(text, branded string) string {
+	build := regValue(text, "CurrentBuildNumber")
+	product := strings.TrimSpace(branded)
+	if product == "" {
+		product = regValue(text, "ProductName")
+	}
+	product = windowsProduct(product, build)
+	if code := windowsReleaseCode(text); code != "" && !strings.Contains(product, code) {
+		product += " (" + code + ")"
+	}
+	return strings.TrimSpace(product)
+}
+
+// WindowsDesktop is the Windows visual style: Fluent, Metro, or Aero.
+func WindowsDesktop() string {
+	build := regValue(windowsCurrentVersion(), "CurrentBuildNumber")
+	switch {
+	case build == "" || buildAtLeast(build, 10240):
+		return "Fluent"
+	case buildAtLeast(build, 9200):
+		return "Metro"
+	default:
+		return "Aero"
+	}
 }
 
 func windowsKernelVersion(text string) string {

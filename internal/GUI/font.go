@@ -1,6 +1,11 @@
 package gui
 
+import "runtime"
+
 func GetFont() string {
+	if runtime.GOOS == "windows" {
+		return windowsUIFont()
+	}
 	ctx := StyleContext{
 		Name:      "gtk-font-name",
 		GSettings: "font-name",

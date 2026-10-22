@@ -34,7 +34,8 @@ func GetDistro(osName, os_arch, kernel_machine, distroShorthand, ascii_distro st
 		build := strings.TrimSpace(utils.RunCommand("sw_vers", "-buildVersion"))
 		distro, asciiName, hideArch = formatApple(product, version, build, distroShorthand)
 	case Windows:
-		distro = windowsDistroFromReg(windowsCurrentVersion())
+		text := windowsCurrentVersion()
+		distro = windowsDistroName(text, windowsLongName())
 		asciiName = windowsArt(distro)
 	case Solaris, illumos:
 		distro, asciiName, releaseName, releaseID, releaseLike = FormatDistro(osName, distroShorthand, files)

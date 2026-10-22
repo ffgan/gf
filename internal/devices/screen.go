@@ -21,7 +21,7 @@ func GetResolution(osName, machine string, refresh bool) string {
 	case cli.Iphone:
 		resolution = getResolutionIOS(machine)
 	case cli.Windows:
-		resolution = getResolutionWindows()
+		resolution = getResolutionWindows(refresh)
 	case cli.Haiku:
 		resolution = getResolutionHaiku()
 	default:
