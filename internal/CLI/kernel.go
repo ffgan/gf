@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -94,6 +95,10 @@ func UName(command string) string {
 	}
 	out, err := utils.CommandOutput("uname", command)
 	if err != nil {
+		// Windows PowerShell has no uname. Missing it must not abort startup.
+		if runtime.GOOS == "windows" {
+			return ""
+		}
 		fmt.Fprintf(os.Stderr, "Failed to run uname %s: %v\n", command, err)
 		os.Exit(1)
 	}
