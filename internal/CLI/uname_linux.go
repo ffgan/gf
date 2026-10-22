@@ -23,7 +23,9 @@ func loadUts() (*syscall.Utsname, bool) {
 	return &uts, true
 }
 
-func utsString(a [65]int8) string {
+// syscall.Utsname fields are [65]int8 on amd64 and [65]uint8 on arm,
+// ppc64, riscv64, and s390x. Android reuses those linux types.
+func utsString[T int8 | uint8](a [65]T) string {
 	b := make([]byte, 0, 65)
 	for _, c := range a {
 		if c == 0 {
