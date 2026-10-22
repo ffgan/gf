@@ -16,7 +16,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 
-version="${VERSION:-0.3.2}"
+version="${VERSION:-0.3.3}"
 version="${version#v}"
 dist="${DIST_DIR:-$root/dist}"
 mode=build
