@@ -45,16 +45,20 @@ func DetectPackages(osname string, cfg PackageConfig) string {
 	if !cfg.Minimal && utils.CommandExists("pip") {
 		add("pip", utils.GetPkgCount("pip", "freeze"))
 	}
-	if !cfg.Minimal && utils.CommandExists("cargo") {
-		out, _ := utils.CommandOutput("cargo", "install", "--list")
-		lines := 0
-		sc := bufio.NewScanner(bytes.NewReader(out))
-		for sc.Scan() {
-			if !strings.HasPrefix(sc.Text(), " ") {
-				lines++
+	if !cfg.Minimal {
+		if n, ok := countCargoInstalls(); ok {
+			add("cargo", n)
+		} else if utils.CommandExists("cargo") {
+			out, _ := utils.CommandOutput("cargo", "install", "--list")
+			lines := 0
+			sc := bufio.NewScanner(bytes.NewReader(out))
+			for sc.Scan() {
+				if !strings.HasPrefix(sc.Text(), " ") {
+					lines++
+				}
 			}
+			add("cargo", lines)
 		}
-		add("cargo", lines)
 	}
 	if !cfg.Minimal && utils.CommandExists("npm") {
 		if st, err := os.Stat("/usr/lib/node_modules"); err == nil && st.IsDir() {
@@ -162,9 +166,9 @@ func DetectPackages(osname string, cfg PackageConfig) string {
 			}
 			add("choco", utils.FilePathGlobLens(filepath.Join(pdata, "chocolatey/lib/*")))
 		}
-		if utils.CommandExists("winget") {
-			add("winget", utils.GetPkgCount("winget", "list", "--accept-source-agreements"))
-		}
+		// winget list talks to the network and often takes tens of seconds.
+		// The uninstall registry is the local program list.
+		add("programs", countInstalledPrograms())
 	}
 
 	// --- Total and formatting ---

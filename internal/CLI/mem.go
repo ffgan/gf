@@ -223,12 +223,6 @@ func getMemorySolaris() (int64, int64, error) {
 	return memUsed, memTotal, nil
 }
 
-func getMemoryWindows() (int64, int64, error) {
-	// This is a simplified version for Windows
-	// In practice, you'd use golang.org/x/sys/windows for proper Windows API calls
-	return 0, 0, fmt.Errorf("Windows support requires additional implementation")
-}
-
 func sysctlInt64(name string) (int64, error) {
 	value, err := strconv.ParseInt(strings.TrimSpace(utils.RunCommand("sysctl", "-n", name)), 10, 64)
 	return value, err

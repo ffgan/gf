@@ -109,6 +109,8 @@ func GetCPUInfo(OS, Machine string, config CPUConfig) (*CPUInfo, error) {
 	switch OS {
 	case Linux:
 		return getCPULinux(info, config)
+	case Windows:
+		return getCPUWindows(info)
 	case Darwin:
 		return getCPUDarwin(info, config)
 	case FreeBSD, OpenBSD, NetBSD, DragonFly, BSD, Bitrig:
@@ -336,6 +338,20 @@ func getCPUSolaris(info *CPUInfo, config CPUConfig) (*CPUInfo, error) {
 		}
 	}
 
+	return info, nil
+}
+
+func getCPUWindows(info *CPUInfo) (*CPUInfo, error) {
+	proc := utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0`)
+	info.Name = regValue(proc, "ProcessorNameString")
+	if info.Name == "" {
+		return nil, fmt.Errorf("cpu name not in the registry")
+	}
+	if mhz, err := strconv.Atoi(regNumber(regValue(proc, "~MHz"))); err == nil {
+		info.Speed = mhz
+	}
+	list := utils.RunCommand("reg.exe", "query", `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor`)
+	info.Cores = countRegSubkeys(list)
 	return info, nil
 }
 

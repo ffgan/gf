@@ -119,23 +119,6 @@ func getResolutionIOS(machine string) string {
 	return ""
 }
 
-// --- Windows ---
-func getResolutionWindows() string {
-	out, err := utils.CommandOutput("wmic", "path", "Win32_VideoController", "get", "CurrentHorizontalResolution,CurrentVerticalResolution")
-	if err != nil {
-		return ""
-	}
-	lines := strings.Split(string(out), "\n")
-	var resolutions []string
-	for _, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) == 2 {
-			resolutions = append(resolutions, fmt.Sprintf("%sx%s", fields[0], fields[1]))
-		}
-	}
-	return strings.Join(resolutions, ", ")
-}
-
 // --- Haiku ---
 func getResolutionHaiku() string {
 	out, err := utils.CommandOutput("screenmode")

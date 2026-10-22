@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/ffgan/gf/internal/utils"
 )
@@ -119,7 +120,18 @@ func readQt5ctTheme(key string) string {
 	return ""
 }
 
+var (
+	gsettingsOnce sync.Once
+	gsettingsOK   bool
+)
+
 func getGSettings(schema, key string) string {
+	gsettingsOnce.Do(func() {
+		gsettingsOK = utils.CommandExists("gsettings")
+	})
+	if !gsettingsOK {
+		return ""
+	}
 	out := utils.RunCommand("gsettings", "get", schema, key)
 	return strings.Trim(strings.TrimSpace(out), "'\"")
 }

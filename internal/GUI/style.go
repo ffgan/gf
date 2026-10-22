@@ -2,6 +2,7 @@ package gui
 
 import (
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/ffgan/gf/internal/utils"
@@ -22,7 +23,9 @@ func getStyle(ctx StyleContext) string {
 	var gtk2, gtk3, qt, kde string
 
 	display := os.Getenv("DISPLAY")
-	if display == "" {
+	if display == "" || runtime.GOOS == "windows" {
+		// Git Bash sets DISPLAY. GTK and Qt settings are not there,
+		// and probing them walks the process list.
 		return ""
 	}
 

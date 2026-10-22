@@ -2,8 +2,10 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 func RunFirst(cmd string, args ...string) string {
@@ -43,13 +45,21 @@ func CommandExists(cmd string) bool {
 	return err == nil
 }
 
+// commandTimeout stops a probe that would otherwise sit on a slow
+// Windows helper such as winget, wmic, or a store execution alias.
+const commandTimeout = 8 * time.Second
+
 func CommandOutput(name string, args ...string) ([]byte, error) {
-	out, err := exec.Command(name, args...).Output()
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, name, args...).Output()
 	return out, err
 }
 
 func CommandCombinedOutput(name string, args ...string) ([]byte, error) {
-	out, err := exec.Command(name, args...).CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	return out, err
 }
 

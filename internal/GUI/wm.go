@@ -13,6 +13,13 @@ func GetWM(osName, kernelName string) string {
 	if wmRun {
 		return wm
 	}
+	if osName == cli.Windows {
+		// tasklist and ps walk every process. The desktop compositor
+		// on supported Windows is DWM.
+		wm = "DWM"
+		wmRun = true
+		return wm
+	}
 
 	// kernelName := getKernelName()
 	// osName := cli.GetOS()
@@ -88,21 +95,6 @@ func GetWM(osName, kernelName string) string {
 				wm = "Rectangle"
 			default:
 				wm = "Quartz Compositor"
-			}
-
-		case cli.Windows:
-			tasklist := utils.RunCommand("tasklist")
-			for _, w := range []string{"bugn", "Windawesome", "blackbox", "emerge", "litestep"} {
-				if strings.Contains(tasklist, w) {
-					wm = w
-					break
-				}
-			}
-			if wm == "blackbox" {
-				wm = "bbLean (Blackbox)"
-			}
-			if wm != "" {
-				wm += ", DWM.exe"
 			}
 
 		case cli.FreeMiNT:

@@ -288,14 +288,53 @@ func parseSystemProfiler(data, key string) string {
 }
 
 func getWindowsGPU() string {
-	out := utils.RunCommand("wmic", "path", "Win32_VideoController", "get", "caption")
+	out := utils.RunCommand("reg.exe", "query", `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`, "/s", "/v", "DriverDesc")
+	return formatWindowsGPUs(out)
+}
+
+func formatWindowsGPUs(out string) string {
 	var gpus []string
-	for _, line := range strings.Split(out, "\n") {
-		line = utils.Trim(line)
-		if line == "" || strings.Contains(line, "Caption") {
+	seen := map[string]bool{}
+	for _, name := range regAll(out, "DriverDesc") {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
 			continue
 		}
-		gpus = append(gpus, line)
+		seen[name] = true
+		gpus = append(gpus, name)
 	}
+	gpus = preferRealGPUs(gpus)
 	return strings.Join(gpus, ", ")
+}
+
+func preferRealGPUs(gpus []string) []string {
+	var real []string
+	for _, gpu := range gpus {
+		low := strings.ToLower(gpu)
+		if strings.Contains(low, "microsoft basic display") || strings.Contains(low, "microsoft remote display") {
+			continue
+		}
+		real = append(real, gpu)
+	}
+	if len(real) > 0 {
+		return real
+	}
+	return gpus
+}
+
+func regAll(out, name string) []string {
+	var vals []string
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.Contains(line, name) || !strings.Contains(line, "REG_") {
+			continue
+		}
+		fields := strings.Fields(line)
+		for i, field := range fields {
+			if strings.HasPrefix(field, "REG_") && i+1 < len(fields) {
+				vals = append(vals, strings.Join(fields[i+1:], " "))
+				break
+			}
+		}
+	}
+	return vals
 }

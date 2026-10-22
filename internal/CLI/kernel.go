@@ -41,14 +41,7 @@ func getKernel(kc kernelconfig) string {
 		return getKernelRelease()
 
 	case Windows:
-		out, _ := utils.CommandOutput("wmic", "os", "get", "Version")
-		// remove "Version" header and trim
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		if len(lines) > 1 {
-			kernel = strings.TrimSpace(lines[1])
-		}
-
-		return kernel
+		return windowsKernelVersion(windowsCurrentVersion())
 
 	case Solaris:
 		ver := getKernelRelease()

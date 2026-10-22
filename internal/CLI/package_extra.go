@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -190,6 +191,51 @@ func countConda() int {
 		}
 	}
 	return 0
+}
+
+// countCargoInstalls reads Cargo's install index. Spawning
+// `cargo install --list` starts the compiler toolchain.
+func countCargoInstalls() (int, bool) {
+	home := os.Getenv("CARGO_HOME")
+	if home == "" {
+		if h := os.Getenv("HOME"); h != "" {
+			home = filepath.Join(h, ".cargo")
+		} else if h := os.Getenv("USERPROFILE"); h != "" {
+			home = filepath.Join(h, ".cargo")
+		}
+	}
+	if home == "" {
+		return -1, false
+	}
+	if data, err := os.ReadFile(filepath.Join(home, ".crates2.json")); err == nil {
+		return bytes.Count(data, []byte(`"bins"`)), true
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".crates.toml"))
+	if err != nil {
+		return -1, false
+	}
+	n := 0
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), `"`) {
+			n++
+		}
+	}
+	return n, true
+}
+
+// countInstalledPrograms counts uninstall-registry keys. `winget list`
+// contacts the network and is the multi-second stall on Windows.
+func countInstalledPrograms() int {
+	keys := []string{
+		`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`,
+		`HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall`,
+		`HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`,
+	}
+	n := 0
+	for _, key := range keys {
+		n += countRegSubkeys(utils.RunCommand("reg.exe", "query", key))
+	}
+	return n
 }
 
 func countSuffix(dir, suffix string) int {
