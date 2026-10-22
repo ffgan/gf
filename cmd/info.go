@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ffgan/gf/configs"
 	cli "github.com/ffgan/gf/internal/CLI"
@@ -80,6 +81,8 @@ type hardware struct {
 	plain    bool
 	verbose  bool
 	disabled map[string]bool
+	extraMu  sync.Mutex
+	extra    map[string]string
 
 	resolution string
 

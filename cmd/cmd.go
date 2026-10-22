@@ -144,6 +144,10 @@ func Run(ASCIIFiles embed.FS) {
 		logo.ApplyDistro(h.ascii_distro)
 	}
 
+	if jsonMode {
+		h.writeJSON(os.Stdout)
+		return
+	}
 	show(art, h.Rows(), h.gap())
 	if hyOpts.AskExit {
 		fmt.Fprint(os.Stderr, "Press enter to exit...")

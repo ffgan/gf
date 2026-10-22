@@ -34,6 +34,38 @@ disk_show=('/')
 	}
 }
 
+func TestParsePrin(t *testing.T) {
+	cfg := DefaultConfig()
+	data := `
+print_info() {
+    prin "Hello" "world"
+    prin "just text"
+    info "Board" board
+}
+`
+	if err := ParseConfig(data, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.InfoList) != 3 {
+		t.Fatalf("lines = %#v", cfg.InfoList)
+	}
+	if cfg.InfoList[0][0] != "Hello" || cfg.InfoList[0][1] != "prin" || cfg.InfoList[0][2] != "world" {
+		t.Fatalf("prin = %#v", cfg.InfoList[0])
+	}
+	if cfg.InfoList[1][0] != "prin" || cfg.InfoList[1][1] != "just text" {
+		t.Fatalf("bare prin = %#v", cfg.InfoList[1])
+	}
+	if cfg.InfoList[2][1] != "board" {
+		t.Fatalf("board = %#v", cfg.InfoList[2])
+	}
+	if err := ParseConfig("print_info() {\n    info title\n}\nweather_location=\"Singapore\"\ncommand=\"uname -r\"\n", &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.WeatherLocation != "Singapore" || cfg.CommandText != "uname -r" {
+		t.Fatalf("fastfetch config = %#v", cfg.Fastfetch)
+	}
+}
+
 func TestParseConfigWithoutPrintInfo(t *testing.T) {
 	cfg := DefaultConfig()
 	before := len(cfg.InfoList)

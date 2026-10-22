@@ -8,6 +8,7 @@ import (
 
 	"github.com/ffgan/gf/configs"
 	"github.com/ffgan/gf/internal/hyfetch"
+	"github.com/ffgan/gf/internal/modules"
 	"github.com/ffgan/gf/internal/utils"
 )
 
@@ -22,6 +23,9 @@ var (
 	stdoutMode  bool
 	verbose     bool
 	vverbose    bool
+	jsonMode    bool
+	listModules bool
+	structure   string
 )
 
 func setupArgs(config *configs.Config) {
@@ -115,6 +119,15 @@ Options:
 	fs.BoolVar(&vverbose, "vv", false, "Alias of -v")
 	fs.BoolVar(&printConfig, "print_config", false, "Print a config file and exit")
 	fs.BoolVar(&showVersion, "version", false, "Print the version and exit")
+	fs.BoolVar(&jsonMode, "json", false, "Print the configured info lines as JSON")
+	fs.BoolVar(&listModules, "list_modules", false, "Print every module name and exit")
+	fs.StringVar(&structure, "structure", "", "Modules to show, separated by colons, or all")
+	fs.StringVar(&structure, "s", "", "Alias of --structure")
+	fs.StringVar(&config.CustomText, "custom", config.CustomText, "Text printed by the custom module")
+	fs.StringVar(&config.CommandText, "command", config.CommandText, "Shell command run by the command module")
+	fs.StringVar(&config.WeatherLocation, "weather_location", config.WeatherLocation, "City passed to the weather module")
+	fs.StringVar(&config.WeatherFormat, "weather_format", config.WeatherFormat, "wttr.in format for the weather module")
+	fs.StringVar(&config.SeparatorString, "separator_string", config.SeparatorString, "Character repeated by the separator module")
 	fs.StringVar(&configPathFlag, "config", "", "Config file to load")
 }
 
@@ -142,6 +155,20 @@ func parseArgs(config *configs.Config) map[string]bool {
 	if printConfig {
 		configs.WriteDefault(os.Stdout)
 		os.Exit(0)
+	}
+	if listModules {
+		for _, name := range modules.Names() {
+			fmt.Println(name)
+		}
+		os.Exit(0)
+	}
+	if structure != "" {
+		lines, err := modules.Structure(structure)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gf: %v\n", err)
+			os.Exit(2)
+		}
+		config.InfoList = lines
 	}
 	return disabled
 }

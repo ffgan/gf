@@ -10,6 +10,7 @@ import (
 
 	"github.com/ffgan/gf/internal/info"
 	"github.com/ffgan/gf/internal/logo"
+	"github.com/ffgan/gf/internal/modules"
 	"github.com/ffgan/gf/internal/utils"
 )
 
@@ -17,27 +18,64 @@ func (h *hardware) plainMode() bool {
 	return h.plain || h.Stdout == utils.ON
 }
 
+type infoEntry struct {
+	label  string
+	key    string
+	value  string
+	blank  bool
+	blocks bool
+}
+
 func (h *hardware) Rows() []string {
-	h.prefetch()
 	var rows []string
-	for _, line := range h.InfoList {
-		if h.skipped(line) {
-			continue
-		}
-		label, key := splitInfo(line)
-		switch key {
-		case "", "line_break", "blank":
-			if label == "" || key == "line_break" || key == "blank" {
-				rows = append(rows, "")
-				continue
-			}
-		}
-		if key == "cols" {
-			for _, block := range strings.Split(h.cols, "\n") {
+	for _, entry := range h.entries() {
+		switch {
+		case entry.blank:
+			rows = append(rows, "")
+		case entry.blocks:
+			for _, block := range strings.Split(entry.value, "\n") {
 				if block != "" {
 					rows = append(rows, block)
 				}
 			}
+		case entry.label == "":
+			rows = append(rows, entry.value)
+		default:
+			for _, part := range strings.Split(entry.value, "\n") {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+				rows = append(rows, h.formatPair(entry.label, part))
+			}
+		}
+	}
+	return rows
+}
+
+func (h *hardware) entries() []infoEntry {
+	h.prefetch()
+	var out []infoEntry
+	for _, line := range h.InfoList {
+		if h.skipped(line) {
+			continue
+		}
+		if label, text, ok := prinLine(line); ok {
+			if label == "" {
+				out = append(out, infoEntry{value: text})
+			} else {
+				out = append(out, infoEntry{label: label, value: text})
+			}
+			continue
+		}
+		label, key := splitInfo(line)
+		key = modules.Canonical(key)
+		if key == "" || key == "line_break" || key == "blank" {
+			out = append(out, infoEntry{blank: true})
+			continue
+		}
+		if key == "cols" {
+			out = append(out, infoEntry{key: key, value: h.cols, blocks: true})
 			continue
 		}
 		value := strings.TrimSpace(h.field(key))
@@ -47,19 +85,20 @@ func (h *hardware) Rows() []string {
 			}
 			continue
 		}
-		if label == "" {
-			rows = append(rows, value)
-			continue
-		}
-		for _, part := range strings.Split(value, "\n") {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
-			}
-			rows = append(rows, h.formatPair(label, part))
-		}
+		out = append(out, infoEntry{label: label, key: key, value: value})
 	}
-	return rows
+	return out
+}
+
+func prinLine(line []string) (label, text string, ok bool) {
+	n := len(line)
+	if n >= 2 && line[n-2] == "prin" {
+		if n >= 3 {
+			return line[0], line[n-1], true
+		}
+		return "", line[n-1], true
+	}
+	return "", "", false
 }
 
 func (h *hardware) skipped(line []string) bool {
@@ -72,7 +111,8 @@ func (h *hardware) skipped(line []string) bool {
 		}
 	}
 	_, key := splitInfo(line)
-	return h.disabled[strings.ToLower(key)]
+	key = modules.Canonical(key)
+	return h.disabled[strings.ToLower(key)] || h.disabled[key]
 }
 
 func splitInfo(line []string) (label, key string) {
@@ -96,13 +136,17 @@ func (h *hardware) prefetch() {
 		if h.skipped(line) {
 			continue
 		}
+		if _, _, ok := prinLine(line); ok {
+			continue
+		}
 		_, key := splitInfo(line)
+		key = modules.Canonical(key)
 		if key == "" || key == "line_break" || key == "blank" || key == "distro" || seen[key] {
 			continue
 		}
 		seen[key] = true
 		switch key {
-		case "wm_theme", "term_font", "underline":
+		case "wm_theme", "term_font", "underline", "separator":
 			second = append(second, key)
 		default:
 			first = append(first, key)
@@ -124,6 +168,11 @@ func (h *hardware) prefetch() {
 }
 
 func (h *hardware) invoke(key string) {
+	key = modules.Canonical(key)
+	if detect, ok := fastfetchDetectors[key]; ok {
+		h.remember(key, detect(h))
+		return
+	}
 	method := reflect.ValueOf(h).MethodByName("Get_" + key)
 	if !method.IsValid() {
 		if h.verbose {
@@ -135,6 +184,10 @@ func (h *hardware) invoke(key string) {
 }
 
 func (h *hardware) field(name string) string {
+	name = modules.Canonical(name)
+	if value, ok := h.recall(name); ok {
+		return value
+	}
 	switch name {
 	case "distro":
 		return h.distro

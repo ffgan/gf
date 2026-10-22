@@ -25,7 +25,17 @@ type Config struct {
 	ASCIIOptions
 	ImageOptions
 	MiscOptions
+	Fastfetch
 	PrintInfo
+}
+
+// Fastfetch holds options for the modules that came from fastfetch.
+type Fastfetch struct {
+	CustomText      string `gf:"custom"`
+	CommandText     string `gf:"command"`
+	WeatherLocation string `gf:"weather_location"`
+	WeatherFormat   string `gf:"weather_format"`
+	SeparatorString string `gf:"separator_string"`
 }
 
 type Title struct {
