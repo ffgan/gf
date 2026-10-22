@@ -66,6 +66,22 @@ gf --june
 
 信息行里暂时检测不到的项目会跳过，不会占一行空输出。`--v` 会把跳过的项目写到标准错误。
 
+## fastfetch 模块
+
+fastfetch 的模块都可以写进 `print_info()`，名字和 fastfetch 一致。已经有的 neofetch 行会接着用原来的检测，例如 `os` 就是发行版，`host` 就是机型，`display` 就是分辨率。新补上的包括主板、机箱、启动项、亮度、Btrfs、摄像头、蓝牙适配器、CPU 缓存和占用、磁盘 IO、物理磁盘、内存条、DNS、Wi-Fi、流量、键鼠手柄、登录管理器、负载、进程、声音、TPM、壁纸、天气、OpenGL、OpenCL、Vulkan、VA-API、ZFS、终端主题，以及 `break`、`separator`、`custom`、`command`、`datetime`、`version`。
+
+```bash
+gf --list_modules
+gf -s os:host:kernel:cpu:cpucache:memory:disk
+gf -s all
+gf --json
+gf --custom "hello from gf"
+```
+
+`command="uname -r"` 配 `info "Uname" command` 会跑这条命令。`weather_location` 和 `weather_format` 交给 wttr.in，格式和 fastfetch 一样。`prin "标签" "内容"` 直接印一行，不检测。
+
+`--structure all` 会把每个模块都跑一遍。天气、CPU 占用和最忙进程会各等一小会儿；平时不写进默认配置，避免拖慢原来的输出。
+
 ## 默认会显示的内容
 
 用户名和主机名、操作系统、机型、内核、开机时间、软件包、Shell、分辨率、桌面环境和窗口管理器、主题、CPU、内存、磁盘、本地 IP、网卡，以及两行色块。桌面、电池、蓝牙这些只在检测得到时出现。

@@ -155,6 +155,9 @@ func DefaultConfig() Config {
 		MiscOptions: MiscOptions{
 			Stdout: utils.AUTO,
 		},
+		Fastfetch: Fastfetch{
+			WeatherFormat: "%t - %C (%l)",
+		},
 		PrintInfo: PrintInfo{
 			InfoList: [][]string{
 				{"title"},
@@ -241,14 +244,30 @@ func ParseConfig(data string, config *Config) error {
 		} else {
 			info_line_list = strings.Split(real_lines[i], " ")
 		}
+		kind := ""
 		var tmp []string
 		for _, item := range info_line_list {
-			if item == "" || item == "info" {
+			item = strings.TrimSpace(strings.ReplaceAll(item, "\"", ""))
+			if item == "" {
 				continue
 			}
-			tmp = append(tmp, strings.ReplaceAll(item, "\"", ""))
+			if item == "info" || item == "prin" {
+				kind = item
+				continue
+			}
+			tmp = append(tmp, item)
 		}
-
+		if kind == "prin" {
+			switch len(tmp) {
+			case 0:
+				continue
+			case 1:
+				config.InfoList = append(config.InfoList, []string{"prin", tmp[0]})
+			default:
+				config.InfoList = append(config.InfoList, []string{tmp[0], "prin", tmp[len(tmp)-1]})
+			}
+			continue
+		}
 		config.InfoList = append(config.InfoList, tmp)
 	}
 	return applyAssignments(config, real_lines[print_info_lines_end+1:])
