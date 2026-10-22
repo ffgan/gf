@@ -159,16 +159,7 @@ func DetectPackages(osname string, cfg PackageConfig) string {
 			add("macports", utils.GetPkgCount("port", "installed"))
 		}
 	case Windows:
-		if utils.CommandExists("choco") {
-			pdata := os.Getenv("ProgramData")
-			if pdata == "" {
-				pdata = `C:\ProgramData`
-			}
-			add("choco", utils.FilePathGlobLens(filepath.Join(pdata, "chocolatey/lib/*")))
-		}
-		// winget list talks to the network and often takes tens of seconds.
-		// The uninstall registry is the local program list.
-		add("programs", countInstalledPrograms())
+		addWindowsPackages(add)
 	}
 
 	// --- Total and formatting ---

@@ -50,6 +50,9 @@ func openboxTheme() string {
 
 // GetTermFont reads the font configured by the detected terminal emulator.
 func GetTermFont(term string) string {
+	if font := windowsTermFont(term); font != "" {
+		return font
+	}
 	low := strings.ToLower(term)
 	switch {
 	case strings.Contains(low, "xfce4-terminal"):

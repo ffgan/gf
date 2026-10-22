@@ -80,6 +80,8 @@ func pagefileBytes() (int64, int64, bool) {
 	off := 0
 	for off+16 <= len(buf) {
 		next := int(binary.LittleEndian.Uint32(buf[off:]))
+		// mingw SYSTEM_PAGEFILE_INFORMATION, the layout fastfetch reads:
+		// NextEntryOffset, TotalUsed, PeakUsed, CurrentSize.
 		pagesUsed := binary.LittleEndian.Uint32(buf[off+4:])
 		pagesTotal := binary.LittleEndian.Uint32(buf[off+12:])
 		used += uint64(pagesUsed) * page

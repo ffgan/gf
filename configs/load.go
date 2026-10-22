@@ -184,6 +184,7 @@ func DefaultConfig() Config {
 				{"Swap", "swap"},
 				{"Disk", "disk"},
 				{"Battery", "battery"},
+				{"Power Adapter", "power_adapter"},
 				{"Local IP", "local_ip"},
 				{"Locale", "locale"},
 				{"Users", "users"},

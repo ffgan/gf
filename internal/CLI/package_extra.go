@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -234,6 +235,95 @@ func countInstalledPrograms() int {
 	n := 0
 	for _, key := range keys {
 		n += countRegSubkeys(utils.RunCommand("reg.exe", "query", key))
+	}
+	return n
+}
+
+func addWindowsPackages(add func(string, int)) {
+	home := os.Getenv("USERPROFILE")
+	if home == "" {
+		home = os.Getenv("HOME")
+	}
+	pdata := os.Getenv("ProgramData")
+	cfg := ""
+	if home != "" {
+		cfg = filepath.Join(home, ".config", "scoop", "config.json")
+	}
+	user, global := scoopAppCounts(cfg, home, pdata)
+	if global > 0 {
+		add("scoop-user", user)
+		add("scoop-global", global)
+	} else {
+		add("scoop", user)
+	}
+
+	chocoRoot := os.Getenv("ChocolateyInstall")
+	if chocoRoot == "" && utils.CommandExists("choco") {
+		if pdata == "" {
+			pdata = `C:\ProgramData`
+		}
+		chocoRoot = filepath.Join(pdata, "chocolatey")
+	}
+	if chocoRoot != "" {
+		add("choco", countDirsExcept(filepath.Join(chocoRoot, "lib"), "choco"))
+	}
+	add("pacman", countMsysPacman())
+	// winget list talks to the network and often takes tens of seconds.
+	// The uninstall registry is the local program list.
+	add("programs", countInstalledPrograms())
+}
+
+func scoopAppCounts(configPath, home, programData string) (user, global int) {
+	root, globalRoot := "", ""
+	if configPath != "" {
+		if data, err := os.ReadFile(configPath); err == nil {
+			var cfg struct {
+				Root   string `json:"root_path"`
+				Global string `json:"global_path"`
+			}
+			if json.Unmarshal(data, &cfg) == nil {
+				root = cfg.Root
+				globalRoot = cfg.Global
+			}
+		}
+	}
+	if root == "" && home != "" {
+		root = filepath.Join(home, "scoop")
+	}
+	if root != "" {
+		user = countDirsExcept(filepath.Join(root, "apps"), "scoop")
+	}
+	if globalRoot == "" && programData != "" {
+		globalRoot = filepath.Join(programData, "scoop")
+	}
+	if globalRoot != "" {
+		global = countDirsExcept(filepath.Join(globalRoot, "apps"), "scoop")
+	}
+	return user, global
+}
+
+func countMsysPacman() int {
+	prefix := os.Getenv("MSYSTEM_PREFIX")
+	if prefix == "" {
+		return 0
+	}
+	return countDirs(filepath.Join(prefix, "..", "var", "lib", "pacman", "local"))
+}
+
+func countDirsExcept(path, skip string) int {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if skip != "" && strings.EqualFold(e.Name(), skip) {
+			continue
+		}
+		n++
 	}
 	return n
 }
