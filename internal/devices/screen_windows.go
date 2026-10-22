@@ -150,6 +150,9 @@ func monitorDPI(user32 *syscall.LazyDLL, x, y int32) int {
 		return 0
 	}
 	mon := user32.NewProc("MonitorFromPoint")
+	if mon.Find() != nil {
+		return 0
+	}
 	var pt struct{ x, y int32 }
 	pt.x, pt.y = x, y
 	h, _, _ := mon.Call(*(*uintptr)(unsafe.Pointer(&pt)), 0)
@@ -169,12 +172,23 @@ func monitorDPI(user32 *syscall.LazyDLL, x, y int32) int {
 }
 
 func systemDPI(user32 *syscall.LazyDLL) int {
-	dc, _, _ := user32.NewProc("GetDC").Call(0)
+	getDC := user32.NewProc("GetDC")
+	release := user32.NewProc("ReleaseDC")
+	if getDC.Find() != nil || release.Find() != nil {
+		return 96
+	}
+	dc, _, _ := getDC.Call(0)
 	if dc == 0 {
 		return 96
 	}
-	dpi, _, _ := user32.NewProc("GetDeviceCaps").Call(dc, 88)
-	user32.NewProc("ReleaseDC").Call(0, dc)
+	defer release.Call(0, dc)
+	// GetDeviceCaps is exported by gdi32. Looking it up in user32 panics,
+	// because LazyProc.Call calls mustFind.
+	caps := syscall.NewLazyDLL("gdi32.dll").NewProc("GetDeviceCaps")
+	if caps.Find() != nil {
+		return 96
+	}
+	dpi, _, _ := caps.Call(dc, 88) // LOGPIXELSX
 	if dpi == 0 {
 		return 96
 	}
