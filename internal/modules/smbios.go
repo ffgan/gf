@@ -6,10 +6,72 @@ import (
 	"strings"
 )
 
+// SMBIOSIDs is the baseboard and chassis identity stored in an SMBIOS table.
+type SMBIOSIDs struct {
+	BoardVendor   string
+	BoardName     string
+	BoardVersion  string
+	ChassisVendor string
+	ChassisType   int
+	ChassisKnown  bool
+}
+
+// Board is the vendor, product, and version, with empty OEM placeholders left out.
+func (id SMBIOSIDs) Board() string {
+	return joinID(id.BoardVendor, id.BoardName, id.BoardVersion)
+}
+
+// Chassis is the enclosure type and its vendor.
+func (id SMBIOSIDs) Chassis() string {
+	kind := ""
+	if id.ChassisKnown {
+		kind = ChassisType(id.ChassisType)
+	}
+	return joinID(kind, id.ChassisVendor, "")
+}
+
+// ParseSMBIOSIDs reads type 2 (baseboard) and type 3 (chassis) structures.
+func ParseSMBIOSIDs(table []byte) SMBIOSIDs {
+	var id SMBIOSIDs
+	walkSMBIOS(table, func(typ byte, body, raw []byte) {
+		switch typ {
+		case 2:
+			if id.BoardName != "" || len(body) < 0x08 {
+				return
+			}
+			id.BoardVendor = smbiosString(raw, body[0x04])
+			id.BoardName = smbiosString(raw, body[0x05])
+			id.BoardVersion = smbiosString(raw, body[0x06])
+		case 3:
+			if id.ChassisKnown || len(body) < 0x06 {
+				return
+			}
+			if len(body) > 0x04 {
+				id.ChassisVendor = smbiosString(raw, body[0x04])
+			}
+			id.ChassisType = int(body[0x05])
+			id.ChassisKnown = true
+		}
+	})
+	return id
+}
+
 // ParseMemoryDevices reads an SMBIOS structure table and returns one
 // line per installed type-17 memory device.
 func ParseMemoryDevices(table []byte) []string {
 	var out []string
+	walkSMBIOS(table, func(typ byte, body, raw []byte) {
+		if typ != 17 {
+			return
+		}
+		if line := formatMemoryDevice(body, raw); line != "" {
+			out = append(out, line)
+		}
+	})
+	return out
+}
+
+func walkSMBIOS(table []byte, visit func(typ byte, body, raw []byte)) {
 	for len(table) >= 4 {
 		typ := table[0]
 		length := int(table[1])
@@ -28,14 +90,8 @@ func ParseMemoryDevices(table []byte) []string {
 		}
 		stringsRaw := rest[:end]
 		table = rest[end:]
-		if typ != 17 {
-			continue
-		}
-		if line := formatMemoryDevice(body, stringsRaw); line != "" {
-			out = append(out, line)
-		}
+		visit(typ, body, stringsRaw)
 	}
-	return out
 }
 
 func formatMemoryDevice(body, rawStrings []byte) string {

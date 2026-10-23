@@ -68,7 +68,9 @@ gf --june
 
 ## fastfetch 模块
 
-fastfetch 的模块都可以写进 `print_info()`，名字和 fastfetch 一致。已经有的 neofetch 行会接着用原来的检测，例如 `os` 就是发行版，`host` 就是机型，`display` 就是分辨率。新补上的包括主板、机箱、启动项、亮度、Btrfs、摄像头、蓝牙适配器、CPU 缓存和占用、磁盘 IO、物理磁盘、内存条、DNS、Wi-Fi、流量、键鼠手柄、登录管理器、负载、进程、声音、TPM、壁纸、天气、OpenGL、OpenCL、Vulkan、VA-API、ZFS、终端主题，以及 `break`、`separator`、`custom`、`command`、`datetime`、`version`。
+fastfetch 的模块都可以写进 `print_info()`，名字和 fastfetch 一致。已经有的 neofetch 行会接着用原来的检测，例如 `os` 就是发行版，`host` 就是机型，`display` 就是分辨率。主板、机箱、启动项、亮度、Btrfs、摄像头、蓝牙适配器、CPU 缓存和占用、磁盘 IO、物理磁盘、内存条、DNS、Wi-Fi、流量、键鼠手柄、登录管理器、负载、进程、声音、TPM、壁纸、天气、OpenGL、OpenCL、Vulkan、VA-API、ZFS、终端主题，以及 `break`、`separator`、`custom`、`command`、`datetime`、`version` 都会检测。
+
+Linux 读 sysfs 和 `/proc`。Windows 读 SMBIOS、注册表和系统 API，读不到磁盘时再问 CIM。macOS 用 `sysctl`、`ioreg`、`diskutil` 和 `system_profiler`。FreeBSD、OpenBSD、NetBSD、DragonFly 用 `sysctl`、`kenv`、`geom` 和 `iostat`。磁盘 IO 和网卡流量默认是一小段采样后的速率，和 fastfetch 一样。
 
 ```bash
 gf --list_modules

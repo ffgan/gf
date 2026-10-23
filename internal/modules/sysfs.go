@@ -13,8 +13,12 @@ import (
 // sysRoot is "/" on a real machine. Tests point it at a fixture tree.
 var sysRoot = "/"
 
-// usagePause is the gap between the two /proc samples used for rates.
+// usagePause is the gap between the two /proc samples used for CPU rates.
 var usagePause = 100 * time.Millisecond
+
+// ioSample is the gap fastfetch uses before reporting disk and network rates.
+// Zero prints the counters accumulated since boot.
+var ioSample = 250 * time.Millisecond
 
 func sysPath(elem ...string) string {
 	parts := make([]string, 0, len(elem)+1)
@@ -54,7 +58,7 @@ func Board() string {
 		readTrim("sys", "devices", "virtual", "dmi", "id", "board_version"),
 		readTrim("sys", "class", "dmi", "id", "board_version"),
 	)
-	return joinID(vendor, name, version)
+	return finish(joinID(vendor, name, version), hostPlatform.board)
 }
 
 // Chassis is the enclosure type, plus the vendor when DMI has one.
@@ -74,7 +78,7 @@ func Chassis() string {
 		readTrim("sys", "devices", "virtual", "dmi", "id", "chassis_vendor"),
 		readTrim("sys", "class", "dmi", "id", "chassis_vendor"),
 	)
-	return joinID(kind, vendor, "")
+	return finish(joinID(kind, vendor, ""), hostPlatform.chassis)
 }
 
 func joinID(a, b, c string) string {
@@ -103,7 +107,7 @@ func firstNonEmpty(values ...string) string {
 func Bootmgr() string {
 	order, ok := ParseBootOrder(readBytes("sys", "firmware", "efi", "efivars", "BootCurrent-8be4df61-93ca-11d2-aa0d-00e098032b8c"))
 	if !ok {
-		return ""
+		return callPlatform(hostPlatform.bootmgr)
 	}
 	name := ParseBootName(readBytes("sys", "firmware", "efi", "efivars", fmt.Sprintf("Boot%04X-8be4df61-93ca-11d2-aa0d-00e098032b8c", order)))
 	if name == "" {
@@ -120,7 +124,7 @@ func Brightness() string {
 	dir := sysPath("sys", "class", "backlight")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return callPlatform(hostPlatform.brightness)
 	}
 	var lines []string
 	for _, entry := range entries {
@@ -130,7 +134,7 @@ func Brightness() string {
 			lines = append(lines, line)
 		}
 	}
-	return joinLines(lines)
+	return finish(joinLines(lines), hostPlatform.brightness)
 }
 
 // Btrfs lists mounted filesystems under /sys/fs/btrfs.
@@ -182,7 +186,7 @@ func Camera() string {
 	dir := sysPath("sys", "class", "video4linux")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return callPlatform(hostPlatform.camera)
 	}
 	var lines []string
 	for _, entry := range entries {
@@ -192,7 +196,7 @@ func Camera() string {
 		}
 		lines = append(lines, name)
 	}
-	return joinLines(lines)
+	return finish(joinLines(lines), hostPlatform.camera)
 }
 
 // BluetoothRadio lists host controllers.
@@ -200,7 +204,7 @@ func BluetoothRadio() string {
 	dir := sysPath("sys", "class", "bluetooth")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return callPlatform(hostPlatform.bluetoothRadio)
 	}
 	var lines []string
 	for _, entry := range entries {
@@ -220,7 +224,7 @@ func BluetoothRadio() string {
 			lines = append(lines, entry.Name())
 		}
 	}
-	return joinLines(lines)
+	return finish(joinLines(lines), hostPlatform.bluetoothRadio)
 }
 
 // CPUCache summarises each cache level from sysfs.
@@ -228,25 +232,10 @@ func CPUCache() string {
 	cpuDir := sysPath("sys", "devices", "system", "cpu")
 	entries, err := os.ReadDir(cpuDir)
 	if err != nil {
-		return ""
-	}
-	type item struct {
-		level int
-		size  uint64
-		kind  string
-		num   int
+		return callPlatform(hostPlatform.cpuCache)
 	}
 	seen := map[string]bool{}
-	var items []item
-	add := func(level int, size uint64, kind string) {
-		for i := range items {
-			if items[i].level == level && items[i].size == size && items[i].kind == kind {
-				items[i].num++
-				return
-			}
-		}
-		items = append(items, item{level: level, size: size, kind: kind, num: 1})
-	}
+	var items []cacheCount
 	for _, entry := range entries {
 		name := entry.Name()
 		if !strings.HasPrefix(name, "cpu") || len(name) < 4 || name[3] < '0' || name[3] > '9' {
@@ -276,36 +265,10 @@ func CPUCache() string {
 				continue
 			}
 			seen[key] = true
-			add(level, size, cacheKind(kind))
+			items = addCache(items, level, size, cacheKind(kind))
 		}
 	}
-	if len(items) == 0 {
-		return ""
-	}
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].level != items[j].level {
-			return items[i].level < items[j].level
-		}
-		return items[i].kind < items[j].kind
-	})
-	var lines []string
-	for level := 1; level <= 4; level++ {
-		var parts []string
-		for _, it := range items {
-			if it.level != level {
-				continue
-			}
-			size := FormatBytes(it.size)
-			if it.num > 1 {
-				size = fmt.Sprintf("%dx %s", it.num, size)
-			}
-			parts = append(parts, fmt.Sprintf("%s (%s)", size, it.kind))
-		}
-		if len(parts) > 0 {
-			lines = append(lines, fmt.Sprintf("L%d: %s", level, strings.Join(parts, ", ")))
-		}
-	}
-	return strings.Join(lines, "\n")
+	return finish(summarizeCache(items), hostPlatform.cpuCache)
 }
 
 func cacheKind(raw string) string {
@@ -356,7 +319,7 @@ func readFile(path string) string {
 func CPUUsage() string {
 	first, _, ok := ParseCPUStat(string(readBytes("proc", "stat")))
 	if !ok {
-		return ""
+		return callPlatform(hostPlatform.cpuUsage)
 	}
 	if usagePause > 0 {
 		time.Sleep(usagePause)
@@ -372,7 +335,7 @@ func CPUUsage() string {
 func Loadavg() string {
 	a, b, c, ok := ParseLoadavg(readTrim("proc", "loadavg"))
 	if !ok {
-		return ""
+		return callPlatform(hostPlatform.loadavg)
 	}
 	return formatLoadavg(a, b, c)
 }
@@ -406,14 +369,14 @@ func DNS() string {
 			}
 		}
 	}
-	return joinLines(list)
+	return finish(joinLines(list), hostPlatform.dns)
 }
 
 // InitSystem is PID 1's command name, plus a systemd version when it is cheap to read.
 func InitSystem() string {
 	name := readTrim("proc", "1", "comm")
 	if name == "" {
-		return ""
+		return callPlatform(hostPlatform.initSystem)
 	}
 	if name == "systemd" {
 		if ver := systemdVersion(runCombined("systemctl", "--version")); ver != "" {
@@ -425,7 +388,7 @@ func InitSystem() string {
 
 // Keyboard lists real keyboards from the input device list.
 func Keyboard() string {
-	return joinLines(ParseKeyboards(readFile(sysPath("proc", "bus", "input", "devices"))))
+	return finish(joinLines(ParseKeyboards(readFile(sysPath("proc", "bus", "input", "devices")))), hostPlatform.keyboard)
 }
 
 // Gamepad lists joystick devices.
@@ -437,7 +400,7 @@ func Gamepad() string {
 	dir := sysPath("sys", "class", "input")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return callPlatform(hostPlatform.gamepad)
 	}
 	var lines []string
 	for _, entry := range entries {
@@ -449,7 +412,7 @@ func Gamepad() string {
 			lines = append(lines, name)
 		}
 	}
-	return joinLines(lines)
+	return finish(joinLines(lines), hostPlatform.gamepad)
 }
 
 // Mouse lists mice from sysfs.
@@ -457,7 +420,7 @@ func Mouse() string {
 	dir := sysPath("sys", "class", "input")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return callPlatform(hostPlatform.mouse)
 	}
 	var lines []string
 	for _, entry := range entries {
@@ -469,14 +432,14 @@ func Mouse() string {
 			lines = append(lines, name)
 		}
 	}
-	return joinLines(lines)
+	return finish(joinLines(lines), hostPlatform.mouse)
 }
 
 // Processes counts userspace tasks and their threads.
 func Processes() string {
 	procs := readProcs()
 	if len(procs) == 0 && !dirExists(sysPath("proc")) {
-		return ""
+		return callPlatform(hostPlatform.processes)
 	}
 	var n, threads uint64
 	for _, p := range procs {
@@ -486,17 +449,14 @@ func Processes() string {
 		n++
 		threads += p.threads
 	}
-	if n == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%d (%d threads)", n, threads)
+	return formatProcesses(n, threads, true)
 }
 
 // Top is the busiest userspace processes over a short sample.
 func Top() string {
 	first := readProcs()
 	if len(first) == 0 {
-		return ""
+		return callPlatform(hostPlatform.top)
 	}
 	if usagePause > 0 {
 		time.Sleep(usagePause)
@@ -574,10 +534,10 @@ func Sound() string {
 	cards := ParseSoundCards(readFile(sysPath("proc", "asound", "cards")))
 	codecs := codecNames()
 	if len(codecs) == 0 {
-		return joinLines(cards)
+		return finish(joinLines(cards), hostPlatform.sound)
 	}
 	if len(cards) == 0 {
-		return joinLines(codecs)
+		return finish(joinLines(codecs), hostPlatform.sound)
 	}
 	return joinLines(append(cards, codecs...))
 }
@@ -628,8 +588,10 @@ func TPM() string {
 		return "TPM " + version + " (" + desc + ")"
 	case version != "":
 		return "TPM " + version
-	default:
+	case desc != "":
 		return desc
+	default:
+		return callPlatform(hostPlatform.tpm)
 	}
 }
 
@@ -638,10 +600,12 @@ func PhysicalMemory() string {
 	if lines := ParseMemoryDevices(readBytes("sys", "firmware", "dmi", "tables", "DMI")); len(lines) > 0 {
 		return joinLines(lines)
 	}
-	if !commandExists("dmidecode") {
-		return ""
+	if commandExists("dmidecode") {
+		if lines := ParseDMIDecodeMemory(runCombined("dmidecode", "-t", "memory")); len(lines) > 0 {
+			return joinLines(lines)
+		}
 	}
-	return joinLines(ParseDMIDecodeMemory(runCombined("dmidecode", "-t", "memory")))
+	return callPlatform(hostPlatform.physicalMemory)
 }
 
 type blockDev struct {
@@ -730,8 +694,12 @@ func isPCIID(value string) bool {
 
 // PhysicalDisk lists real block devices and their size.
 func PhysicalDisk() string {
+	devs := blockDevices()
+	if len(devs) == 0 {
+		return callPlatform(hostPlatform.physicalDisk)
+	}
 	var lines []string
-	for _, dev := range blockDevices() {
+	for _, dev := range devs {
 		if dev.size == 0 {
 			lines = append(lines, dev.model)
 			continue
@@ -741,11 +709,38 @@ func PhysicalDisk() string {
 	return joinLines(lines)
 }
 
-// DiskIO lists bytes read and written since boot for each physical disk.
+// DiskIO reports the read and write rate of each physical disk.
+// With ioSample at zero it reports the totals since boot.
 func DiskIO() string {
+	first := blockDevices()
+	if len(first) == 0 {
+		return callPlatform(hostPlatform.diskIO)
+	}
+	second := map[string]blockDev{}
+	span := ioSample
+	if span > 0 {
+		time.Sleep(span)
+		for _, dev := range blockDevices() {
+			second[dev.name] = dev
+		}
+	}
 	var lines []string
-	for _, dev := range blockDevices() {
-		lines = append(lines, fmt.Sprintf("%s: read %s, written %s", dev.model, FormatBytes(dev.read), FormatBytes(dev.write)))
+	for _, dev := range first {
+		read, write := dev.read, dev.write
+		if span > 0 {
+			nxt, ok := second[dev.name]
+			if !ok {
+				continue
+			}
+			read, write = 0, 0
+			if nxt.read >= dev.read {
+				read = nxt.read - dev.read
+			}
+			if nxt.write >= dev.write {
+				write = nxt.write - dev.write
+			}
+		}
+		lines = append(lines, formatDiskRate(dev.model, read, write, span.Seconds()))
 	}
 	return joinLines(lines)
 }
@@ -753,26 +748,67 @@ func DiskIO() string {
 // NetIO lists received and transmitted bytes on interfaces that are up.
 func NetIO() string {
 	dir := sysPath("sys", "class", "net")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return ""
+	if !dirExists(dir) {
+		return callPlatform(hostPlatform.netIO)
 	}
+	type link struct {
+		rx uint64
+		tx uint64
+	}
+	read := func() map[string]link {
+		out := map[string]link{}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return out
+		}
+		for _, entry := range entries {
+			name := entry.Name()
+			if name == "lo" {
+				continue
+			}
+			state := readTrim("sys", "class", "net", name, "operstate")
+			if state != "" && state != "up" && state != "unknown" {
+				continue
+			}
+			rx, err1 := strconv.ParseUint(readTrim("sys", "class", "net", name, "statistics", "rx_bytes"), 10, 64)
+			tx, err2 := strconv.ParseUint(readTrim("sys", "class", "net", name, "statistics", "tx_bytes"), 10, 64)
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			out[name] = link{rx: rx, tx: tx}
+		}
+		return out
+	}
+	first := read()
+	span := ioSample
+	second := first
+	if span > 0 {
+		time.Sleep(span)
+		second = read()
+	}
+	var names []string
+	for name := range second {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 	var lines []string
-	for _, entry := range entries {
-		name := entry.Name()
-		if name == "lo" {
-			continue
+	for _, name := range names {
+		cur := second[name]
+		prev, ok := first[name]
+		rx, tx := cur.rx, cur.tx
+		if span > 0 {
+			if !ok {
+				continue
+			}
+			rx, tx = 0, 0
+			if cur.rx >= prev.rx {
+				rx = cur.rx - prev.rx
+			}
+			if cur.tx >= prev.tx {
+				tx = cur.tx - prev.tx
+			}
 		}
-		state := readTrim("sys", "class", "net", name, "operstate")
-		if state != "" && state != "up" && state != "unknown" {
-			continue
-		}
-		rx, err1 := strconv.ParseUint(readTrim("sys", "class", "net", name, "statistics", "rx_bytes"), 10, 64)
-		tx, err2 := strconv.ParseUint(readTrim("sys", "class", "net", name, "statistics", "tx_bytes"), 10, 64)
-		if err1 != nil || err2 != nil {
-			continue
-		}
-		lines = append(lines, fmt.Sprintf("%s: rx %s, tx %s", name, FormatBytes(rx), FormatBytes(tx)))
+		lines = append(lines, formatNetRate(name, rx, tx, span.Seconds()))
 	}
 	return joinLines(lines)
 }
@@ -782,7 +818,7 @@ func Monitor() string {
 	dir := sysPath("sys", "class", "drm")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return callPlatform(hostPlatform.monitor)
 	}
 	var lines []string
 	for _, entry := range entries {
@@ -821,7 +857,7 @@ func Monitor() string {
 		}
 		lines = append(lines, strings.Join(parts, " "))
 	}
-	return joinLines(lines)
+	return finish(joinLines(lines), hostPlatform.monitor)
 }
 
 func sqrt(v float64) float64 {
@@ -839,7 +875,7 @@ func sqrt(v float64) float64 {
 func Wifi() string {
 	links := ParseWireless(readFile(sysPath("proc", "net", "wireless")))
 	if len(links) == 0 {
-		return ""
+		return callPlatform(hostPlatform.wifi)
 	}
 	var lines []string
 	for _, link := range links {
@@ -897,7 +933,7 @@ func Wallpaper() string {
 			return found
 		}
 	}
-	return ""
+	return callPlatform(hostPlatform.wallpaper)
 }
 
 func wallpaperFile(path string) string {

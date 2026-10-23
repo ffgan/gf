@@ -212,6 +212,116 @@ func TestCPUCacheFixture(t *testing.T) {
 	}
 }
 
+func TestHostParsers(t *testing.T) {
+	if got := ParseDNSList("1.1.1.1, 8.8.8.8; 2606:4700:4700::1111"); len(got) != 3 || got[2] != "2606:4700:4700::1111" {
+		t.Fatalf("dns list %#v", got)
+	}
+	a, b, c, ok := ParseBraceLoadavg("{ 1.50 0.80 0.40 }")
+	if !ok || formatLoadavg(a, b, c) != "1.50, 0.80, 0.40" {
+		t.Fatalf("brace load %v %v", ok, formatLoadavg(a, b, c))
+	}
+	sample, ok := ParseCPTime("10 1 5 2 82")
+	if !ok || sample.inUse != 18 || sample.total != 100 {
+		t.Fatalf("cp_time %#v %v", sample, ok)
+	}
+	links := ParseNetstatIB("Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll\nen0 1500 <Link> aa 1 0 2048 1 0 1024 0\nlo0 16384 <Link> 1 0 10 1 0 10 0\n")
+	if len(links) != 1 || links[0].name != "en0" || links[0].rx != 2048 || links[0].tx != 1024 {
+		t.Fatalf("netstat %#v", links)
+	}
+	rates := ParseIostat("device r/s w/s kr/s kw/s\nada0 1 2 4 8\n")
+	if len(rates) != 1 || rates[0].name != "ada0" || rates[0].read != 4*1024 || rates[0].write != 8*1024 {
+		t.Fatalf("iostat %#v", rates)
+	}
+	mac := ParseIostat("              disk0\n    KB/t tps  MB/s\n   0.00   0  1.00\n")
+	if len(mac) != 1 || !mac[0].combined || mac[0].read != 1024*1024 {
+		t.Fatalf("darwin iostat %#v", mac)
+	}
+	disks := ParseDiskutil("**********\nWhole: Yes\nVirtual: No\nDevice / Media Name: APPLE SSD\nDisk Size: 500.3 GB (1048576 Bytes)\n")
+	if len(disks) != 1 || disks[0] != "APPLE SSD (1 MiB)" {
+		t.Fatalf("diskutil %#v", disks)
+	}
+	geom := ParseGeomDisk("Geom name: ada0\nMediasize: 1048576 (1M)\ndescr: Samsung SSD\n")
+	if len(geom) != 1 || geom[0] != "Samsung SSD ada0 (1 MiB)" {
+		t.Fatalf("geom %#v", geom)
+	}
+	if cams := ParseCamcontrol("<Samsung SSD 860> at scbus0 (ada0,pass0)\n"); len(cams) != 1 || cams[0] != "Samsung SSD 860" {
+		t.Fatalf("cam %#v", cams)
+	}
+	wifi := ParseNetshWifi("Name : Wi-Fi\nState : connected\nSSID : Home\nSignal : 90%\n")
+	if len(wifi) != 1 || wifi[0] != "Home (90%)" {
+		t.Fatalf("netsh %#v", wifi)
+	}
+	if ParseAirportSSID("Current Wi-Fi Network: Cafe") != "Cafe" || ParseAirportSSID("You are not associated with an AirPort network.") != "" {
+		t.Fatal("airport")
+	}
+	if CleanPNPDesc(`@keyboard.inf,%std%;USB Keyboard`) != "USB Keyboard" {
+		t.Fatal(CleanPNPDesc(`@keyboard.inf,%std%;USB Keyboard`))
+	}
+	if !LooksLikeGamepad("Xbox Wireless Controller") || AppleChassis("MacBookPro18,3") != "Laptop" {
+		t.Fatal("names")
+	}
+	vendor, model, board := ParseIORegPlatform("\"manufacturer\" = <\"Apple Inc.\">\n\"model\" = <4d6163426f6f6b50726f31382c33>\n\"board-id\" = <\"Mac-ABC\">\n")
+	if vendor != "Apple Inc." || model != "MacBookPro18,3" || board != "Mac-ABC" {
+		t.Fatalf("ioreg %q %q %q", vendor, model, board)
+	}
+	mem := FormatMemoryProfile("Memory:\n\n    BANK 0:\n\n      Size: 8 GB\n      Type: DDR4\n      Speed: 3200 MHz\n      Manufacturer: Samsung\n")
+	if len(mem) != 1 || mem[0] != "8 GB DDR4-3200 (Samsung)" {
+		t.Fatalf("memory profile %#v", mem)
+	}
+	if cache := CacheFromSysctl(4, 32*1024, 32*1024, 256*1024, 8*1024*1024); !strings.Contains(cache, "L1:") || !strings.Contains(cache, "4x") || !strings.Contains(cache, "L3:") {
+		t.Fatalf("cache sysctl %q", cache)
+	}
+	top := ParsePSTop(" 20.0 WindowServer\n  1.0 kernel_task\n  0.4 Finder\n")
+	if len(top) != 2 || top[0] != "WindowServer" || top[1] != "Finder" {
+		t.Fatalf("ps top %#v", top)
+	}
+	n, threads, have := ParsePSCount("launchd 2\nFinder 4\n")
+	if n != 2 || threads != 6 || !have {
+		t.Fatalf("ps count %d %d %v", n, threads, have)
+	}
+	boardBody := append([]byte{2, 8, 0, 0, 1, 2, 3, 0}, []byte("Vendor\x00Board\x00v1\x00\x00")...)
+	chassisBody := append([]byte{3, 6, 0, 0, 1, 9}, []byte("Frame\x00\x00")...)
+	id := ParseSMBIOSIDs(append(boardBody, chassisBody...))
+	if id.Board() != "Vendor Board v1" || id.Chassis() != "Laptop Frame" {
+		t.Fatalf("smbios %q %q", id.Board(), id.Chassis())
+	}
+	if snd := ParseSndstat("pcm0: <Realtek ALC1220> (play) default\n"); len(snd) != 1 || snd[0] != "Realtek ALC1220 (default)" {
+		t.Fatalf("sndstat %#v", snd)
+	}
+	if ssid := ParseIfconfigSSID("wlan0: flags=8843\n\tssid Home\n"); len(ssid) != 1 || ssid[0] != "Home (wlan0)" {
+		t.Fatalf("ssid %#v", ssid)
+	}
+}
+
+func TestDiskIOTotals(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "sys", "block", "sda", "device")
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(base, "model"), []byte("Samsung SSD\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "sys", "block", "sda", "size"), []byte("2048\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "sys", "block", "sda", "stat"), []byte("0 0 100 0 0 0 50 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot, oldSample := sysRoot, ioSample
+	sysRoot, ioSample = root, 0
+	t.Cleanup(func() {
+		sysRoot = oldRoot
+		ioSample = oldSample
+	})
+	if got := PhysicalDisk(); got != "Samsung SSD sda (1 MiB)" {
+		t.Fatalf("physical %q", got)
+	}
+	if got := DiskIO(); got != "Samsung SSD sda: 50 KiB (R) - 25 KiB (W)" {
+		t.Fatalf("diskio %q", got)
+	}
+}
+
 func TestHostLoadavg(t *testing.T) {
 	if _, err := os.Stat("/proc/loadavg"); err != nil {
 		t.Skip(err)
