@@ -94,9 +94,10 @@ func diskLabel(mount, subtitle string) string {
 }
 
 // parseDFPOSIX reads one POSIX `df -k -P` data line. Blocks are 1024 bytes.
-// The filesystem and mount point may contain spaces, so the three size
-// columns are taken from immediately before the capacity field.
-func parseDFPOSIX(line string) (used, total int64, percent int, err error) {
+// The filesystem and mount point may contain spaces, so the size columns
+// are taken from immediately before the first capacity field. macOS df
+// also prints an inode percentage; that second % is not the disk capacity.
+func parseDFPOSIX(line string) (used, total, avail int64, percent int, err error) {
 	fields := strings.Fields(line)
 	pct := -1
 	for i, field := range fields {
@@ -106,21 +107,46 @@ func parseDFPOSIX(line string) (used, total int64, percent int, err error) {
 		}
 	}
 	if pct < 3 {
-		return 0, 0, 0, fmt.Errorf("unexpected df columns")
+		return 0, 0, 0, 0, fmt.Errorf("unexpected df columns")
 	}
 	total, err = strconv.ParseInt(fields[pct-3], 10, 64)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, err
 	}
 	used, err = strconv.ParseInt(fields[pct-2], 10, 64)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, err
+	}
+	avail, err = strconv.ParseInt(fields[pct-1], 10, 64)
+	if err != nil {
+		return 0, 0, 0, 0, err
 	}
 	percent, err = strconv.Atoi(strings.TrimSuffix(fields[pct], "%"))
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, err
 	}
-	return used, total, percent, nil
+	return used, total, avail, percent, nil
+}
+
+// containerUsage is the disk bar for an APFS volume group. df's Used
+// column on the sealed system volume counts only that snapshot, while
+// Available is the free space shared by every volume in the container.
+// Finder's storage number is the container size minus that free space.
+func containerUsage(mount string, used, total, avail int64, dataVolume bool) (int64, int) {
+	if dataVolume && mount == "/" && total > avail && avail >= 0 && used >= 0 &&
+		uint64(used)+uint64(avail) < uint64(total) {
+		used = total - avail
+	}
+	if used < 0 {
+		used = 0
+	}
+	if total <= 0 || used <= 0 {
+		return used, 0
+	}
+	if used > total {
+		used = total
+	}
+	return used, int(uint64(used) * 100 / uint64(total))
 }
 
 func humanBytes(n int64) string {

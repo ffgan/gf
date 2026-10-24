@@ -140,7 +140,7 @@ func firstGlobalCIDR() (string, string) {
 // both DWORDs in network byte order.
 func ipv4Prefix(addr, mask uint32) string {
 	ip := net.IPv4(byte(addr), byte(addr>>8), byte(addr>>16), byte(addr>>24)).To4()
-	if ip == nil || ip.IsLoopback() || ip.IsUnspecified() {
+	if ip == nil || !ip.IsGlobalUnicast() {
 		return ""
 	}
 	m := net.IPv4Mask(byte(mask), byte(mask>>8), byte(mask>>16), byte(mask>>24))
@@ -153,11 +153,11 @@ func ipv4Prefix(addr, mask uint32) string {
 
 func addrCIDR(addr net.Addr) string {
 	ipnet, ok := addr.(*net.IPNet)
-	if !ok || ipnet.IP == nil || ipnet.IP.IsLoopback() {
+	if !ok || ipnet.IP == nil {
 		return ""
 	}
 	ip4 := ipnet.IP.To4()
-	if ip4 == nil {
+	if ip4 == nil || !ip4.IsGlobalUnicast() {
 		return ""
 	}
 	ones, bits := ipnet.Mask.Size()

@@ -24,7 +24,26 @@ jobs:
         with:
           go-version-file: .go-version
       - name: Test
-        run: go test ./...
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkgs=$(go list ./... | grep -v '/e2e$')
+          go test $pkgs
+
+  e2e:
+    name: e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: .go-version
+      - name: End to end
+        run: go test -count=1 ./e2e/
 
   package:
     name: package
@@ -90,7 +109,7 @@ jobs:
 
   publish:
     name: publish release
-    needs: [test, package, package-ios]
+    needs: [test, e2e, package, package-ios]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
