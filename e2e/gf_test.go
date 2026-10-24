@@ -140,7 +140,17 @@ func assertDiskLine(t *testing.T, value string) {
 
 func assertLocalIP(t *testing.T, value string) {
 	t.Helper()
-	ip := net.ParseIP(strings.TrimSpace(value))
+	value = strings.TrimSpace(value)
+	// Windows prints "(Ethernet) 10.1.0.22/20". Other systems print the address.
+	if strings.HasPrefix(value, "(") {
+		_, rest, ok := strings.Cut(value, ") ")
+		if !ok {
+			t.Fatalf("local IP %q", value)
+		}
+		value = rest
+	}
+	ipText, _, _ := strings.Cut(value, "/")
+	ip := net.ParseIP(ipText)
 	if ip == nil || ip.To4() == nil || !ip.IsGlobalUnicast() {
 		t.Fatalf("local IP %q", value)
 	}
